@@ -1,0 +1,19 @@
+# CS488 A1
+> Mingze Xu, #20806115
+## Compilation
+The compiation steps is as follows:
+```{bash}
+$ cd A1
+$ premake4 gmake
+$ make
+$ ./A1
+```
+The dev program has been run on the local virtual machine
+
+## Manual
+- **Persistence module** will detect the state of your mouse upon release. If it remains
+unmoved for a longer enough time (by default 2 frames) then the persistence will
+not be triggered. If it is moving, then the speed upon release will be recorded
+and used to set the rotation speed of persistence.
+- **Scaling factor** is bounded by 0.5 and 2.0
+- **Height of cube** is bounded by 1 and 10

@@ -1,0 +1,18 @@
+# CS488 A2
+> Mingze Xu, #20806115
+## Compilation
+The compiation steps is as follows:
+```{bash}
+$ cd A2
+$ premake4 gmake
+$ make
+$ ./A2
+```
+The dev program has been run on the local virtual machine
+
+## Manual
+- Clipping to near and far plane is done before projection in 3D space, and all
+other clippings are done after homogenization in 2D space.
+- Model scaler can be negative, where the model will be streched in the opposite direction
+- LookFrom and LookAt are initialized as if we were observing inside the screen
+- Visitor pattern is used to apply different transformations to different objects (cube and gnomons)

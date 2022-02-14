@@ -1,0 +1,14 @@
+# CS488 A0
+> Mingze Xu, #20806115
+## Compilation
+The compiation steps is as follows:
+```{bash}
+$ cd A0
+$ premake4 gmake
+$ make
+$ ./A0
+```
+The dev program has been run on the local virtual machine
+
+## Manual
+- Scaling factor for +/- keyborad shortcut is chosen to be 0.5
