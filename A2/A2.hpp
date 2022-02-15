@@ -123,17 +123,13 @@ public:
 // Class representing view transformation in the pipeline
 class ViewTrans {
 public:
-	ViewTrans(Controller* controller) : m_controller(controller), viewFrame(baseView()) {}
+	ViewTrans(Controller* controller) : m_controller(controller) {}
 
 	void visit(ColoredObject* obj);
 
-	glm::mat4 baseView();
-	glm::mat4 viewT();
-
+	glm::mat4 view();
 
 	Controller* m_controller;
-	// Current view frame
-	glm::mat4 viewFrame;
 };
 
 // Class representing projection

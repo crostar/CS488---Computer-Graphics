@@ -247,7 +247,7 @@ void A2::appLogic()
 	drawObject(m_vp_edge.get());
 
 	m_controller->resetModelAttr();
-	m_controller->resetViewAttr();
+	//m_controller->resetViewAttr();
 }
 
 //----------------------------------------------------------------------------------------
@@ -303,7 +303,6 @@ void A2::clearFrames() {
 	for (auto &obj : m_objects) {
 		obj->modelFrame = mat4(1.0f);
 	}
-	m_view_trans->viewFrame = m_view_trans->baseView();
 }
 //----------------------------------------------------------------------------------------
 void A2::uploadVertexDataToVbos() {
@@ -683,12 +682,17 @@ void ModelTrans::visit(WorldGnomon* obj) {
 
 // View and Projection transformations
 
-// Translation in view relative to the view frame
-mat4 ViewTrans::viewT() {
+mat4 ViewTrans::view() {
+	vec3 viewDirection = m_controller->lookAt - m_controller->lookFrom;
+	vec3 vz = - viewDirection / glm::length(viewDirection);
+	vec3 vx = glm::cross(m_controller->up, vz);
+	vx = vx / glm::length(vx);
+	vec3 vy = glm::cross(vz, vx);
 	float thetax = m_controller->viewRotateAngle.x;
 	float thetay = m_controller->viewRotateAngle.y;
 	float thetaz = m_controller->viewRotateAngle.z;
-	return glm::transpose(
+
+	mat4 R = glm::transpose(
 		mat4(cos(thetaz), -sin(thetaz), 0, 0,
 							sin(thetaz), cos(thetaz), 0, 0,
 							0, 0, 1, 0,
@@ -702,27 +706,17 @@ mat4 ViewTrans::viewT() {
 								-sin(thetay), 0, cos(thetay), 0,
 								0, 0, 0, 1)
 	) * glm::transpose(
-		mat4(1, 0, 0, m_controller->viewTranslater.x,
-				 0, 1, 0, m_controller->viewTranslater.y,
-			   0, 0, 1, m_controller->viewTranslater.z,
-			 	 0, 0, 0, 1)
-	);
-}
-
-mat4 ViewTrans::baseView() {
-	vec3 viewDirection = m_controller->lookAt - m_controller->lookFrom;
-	vec3 vz = - viewDirection / glm::length(viewDirection);
-	vec3 vx = glm::cross(m_controller->up, vz);
-	vx = vx / glm::length(vx);
-	vec3 vy = glm::cross(vz, vx);
-
-	mat4 R = glm::transpose(
 		mat4(vec4(vx, 0),
 			 		 vec4(vy, 0),
 			 	 	 vec4(vz, 0),
 			 	 	 vec4(0, 0, 0, 1))
 	);
 	mat4 T = glm::transpose(
+		mat4(1, 0, 0, -m_controller->viewTranslater.x,
+				 0, 1, 0, -m_controller->viewTranslater.y,
+			   0, 0, 1, -m_controller->viewTranslater.z,
+			 	 0, 0, 0, 1)
+	) * glm::transpose(
 	  mat4(1, 0, 0, -m_controller->lookFrom.x,
 				 0, 1, 0, -m_controller->lookFrom.y,
 			   0, 0, 1, -m_controller->lookFrom.z,
@@ -738,12 +732,11 @@ mat4 ViewTrans::baseView() {
 }
 
 void ViewTrans::visit(ColoredObject* obj) {
-	mat4 V = glm::inverse(viewT()) * viewFrame;
+	mat4 V = view();
 	for (auto& line : obj->lines) {
 		line.first = V * line.first;
 		line.second = V * line.second;
 	}
-	viewFrame = V;
 }
 
 // Projection
