@@ -12,6 +12,12 @@ public:
 	void set_joint_x(double min, double init, double max);
 	void set_joint_y(double min, double init, double max);
 
+	virtual void renderRecur(
+		const ShaderProgram& shader,
+		const glm::mat4& view,
+		const BatchInfoMap& batchInfoMap,
+		glm::mat4 stackedTrans) override;
+
 	struct JointRange {
 		double min, init, max;
 	};

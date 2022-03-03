@@ -12,16 +12,58 @@
 #include <glm/glm.hpp>
 #include <memory>
 
+#define DEBUG_A3 1
+
 struct LightSource {
 	glm::vec3 position;
 	glm::vec3 rgbIntensity;
 };
 
+class Controller {
+public:
+	enum class Mode {
+		NONE = 0,
+		POSITION = 1,
+		JOINTS = 2
+	};
+
+	enum class MouseButton {
+		NONE = 0,
+		LEFT,
+		MIDDLE,
+		RIGHT
+	};
+
+public:
+	Controller();
+
+	void updateUponMouseEvent(glm::vec2 mouseLocChange);
+	void print();
+	void reset();
+	bool pressed(MouseButton m);
+
+	int mode;
+
+	// glm::mat4 modelFrame; // Last model frame matrix
+	// glm::vec3 modelScaler; // scaler factor in x,y,z directions
+	// glm::vec3 modelRotateAngle; // rotation angle around x,y,z axis
+	glm::vec3 modelTranslater; // translate distance in x,y,z directions
+
+	// glm::vec3 viewRotateAngle; // rotation angle around x,y,z axis
+	// glm::vec3 viewTranslater; // translate distance in x,y,z directions
+
+	MouseButton mouseButtonPressed; // current mouse button pressed
+	glm::vec2 lastMouseLoc; // location of the mouse in the last frame
+};
 
 class A3 : public CS488Window {
 public:
 	A3(const std::string & luaSceneFile);
 	virtual ~A3();
+
+	void initGrid();
+	GLuint m_grid_vao;
+	GLuint m_grid_vbo;
 
 protected:
 	virtual void init() override;
@@ -49,8 +91,10 @@ protected:
 
 	void initPerspectiveMatrix();
 	void uploadCommonSceneUniforms();
-	void renderSceneGraph(const SceneNode &node);
+	// void renderSceneGraph(const SceneNode &node);
+	void renderSceneGraph(SceneNode &node);
 	void renderArcCircle();
+	void updateModel();
 
 	glm::mat4 m_perpsective;
 	glm::mat4 m_view;
@@ -79,4 +123,6 @@ protected:
 	std::string m_luaSceneFile;
 
 	std::shared_ptr<SceneNode> m_rootNode;
+
+	std::unique_ptr<Controller> m_controller;
 };

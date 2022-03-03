@@ -20,6 +20,9 @@ using namespace glm;
 static bool show_gui = true;
 
 const size_t CIRCLE_PTS = 48;
+const float SCALE_FACTOR = 2.0f;
+
+const size_t DIM = 16;
 
 //----------------------------------------------------------------------------------------
 // Constructor
@@ -31,7 +34,8 @@ A3::A3(const std::string & luaSceneFile)
 	  m_vbo_vertexPositions(0),
 	  m_vbo_vertexNormals(0),
 	  m_vao_arcCircle(0),
-	  m_vbo_arcCircle(0)
+	  m_vbo_arcCircle(0),
+		m_controller(new Controller())
 {
 
 }
@@ -42,6 +46,59 @@ A3::~A3()
 {
 
 }
+
+
+void A3::initGrid()
+{
+	size_t sz = 3 * 2 * 2 * (DIM+3);
+
+	float *verts = new float[ sz ];
+	size_t ct = 0;
+	for( int idx = 0; idx < DIM+3; ++idx ) {
+		verts[ ct ] = -1;
+		verts[ ct+1 ] = 0;
+		verts[ ct+2 ] = idx-1;
+		verts[ ct+3 ] = DIM+1;
+		verts[ ct+4 ] = 0;
+		verts[ ct+5 ] = idx-1;
+		ct += 6;
+
+		verts[ ct ] = idx-1;
+		verts[ ct+1 ] = 0;
+		verts[ ct+2 ] = -1;
+		verts[ ct+3 ] = idx-1;
+		verts[ ct+4 ] = 0;
+		verts[ ct+5 ] = DIM+1;
+		ct += 6;
+	}
+
+	// Create the vertex array to record buffer assignments.
+	glGenVertexArrays( 1, &m_grid_vao );
+	glBindVertexArray( m_grid_vao );
+
+	// Create the cube vertex buffer
+	glGenBuffers( 1, &m_grid_vbo );
+	glBindBuffer( GL_ARRAY_BUFFER, m_grid_vbo );
+	glBufferData( GL_ARRAY_BUFFER, sz*sizeof(float),
+		verts, GL_STATIC_DRAW );
+
+	// Specify the means of extracting the position values properly.
+	GLint posAttrib = m_shader.getAttribLocation( "position" );
+	glEnableVertexAttribArray( posAttrib );
+	glVertexAttribPointer( posAttrib, 3, GL_FLOAT, GL_FALSE, 0, nullptr );
+
+	// Reset state to prevent rogue code from messing with *my*
+	// stuff!
+	glBindVertexArray( 0 );
+	glBindBuffer( GL_ARRAY_BUFFER, 0 );
+	glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
+
+	// OpenGL has the buffer now, there's no need for us to keep a copy.
+	delete [] verts;
+
+	CHECK_GL_ERRORS;
+}
+
 
 //----------------------------------------------------------------------------------------
 /*
@@ -74,6 +131,7 @@ void A3::init()
 	// Acquire the BatchInfoMap from the MeshConsolidator.
 	meshConsolidator->getBatchInfoMap(m_batchInfoMap);
 
+	initGrid();
 	// Take all vertex data within the MeshConsolidator and upload it to VBOs on the GPU.
 	uploadVertexDataToVbos(*meshConsolidator);
 
@@ -320,6 +378,32 @@ void A3::guiLogic()
 		firstRun = false;
 	}
 
+	if (ImGui::BeginMainMenuBar()) {
+		if (ImGui::BeginMenu("Application")) {
+			if (ImGui::MenuItem("Reset Position (I)")) {}
+			if (ImGui::MenuItem("Reset Orientation (O)")) {}
+			if (ImGui::MenuItem("Reset Joints (S)")) {}
+			if (ImGui::MenuItem("Reset All (A)")) {}
+			if( ImGui::MenuItem( "Quit Application" ) ) {
+				glfwSetWindowShouldClose(m_window, GL_TRUE);
+			}
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("Edit")) {
+			if (ImGui::MenuItem("Undo (U)")) {}
+			if (ImGui::MenuItem("Redo (R)")) {}
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("Options")) {
+			if (ImGui::MenuItem("Circle (C)")) {}
+			if (ImGui::MenuItem("Z-buffer (Z)")) {}
+			if (ImGui::MenuItem("Backface culling (B)")) {}
+			if (ImGui::MenuItem("Frontface culling (F)")) {}
+			ImGui::EndMenu();
+		}
+		ImGui::EndMainMenuBar();
+	}
+
 	static bool showDebugWindow(true);
 	ImGuiWindowFlags windowFlags(ImGuiWindowFlags_AlwaysAutoResize);
 	float opacity(0.5f);
@@ -327,51 +411,14 @@ void A3::guiLogic()
 	ImGui::Begin("Properties", &showDebugWindow, ImVec2(100,100), opacity,
 			windowFlags);
 
+	ImGui::RadioButton( "Position/Orientation (P)", &(m_controller->mode), 1 );
+	ImGui::RadioButton( "Joints (J)", &(m_controller->mode), 2 );
 
-		// Add more gui elements here here ...
 
 
-		// Create Button, and check if it was clicked:
-		if( ImGui::Button( "Quit Application" ) ) {
-			glfwSetWindowShouldClose(m_window, GL_TRUE);
-		}
-
-		ImGui::Text( "Framerate: %.1f FPS", ImGui::GetIO().Framerate );
+	ImGui::Text( "Framerate: %.1f FPS", ImGui::GetIO().Framerate );
 
 	ImGui::End();
-}
-
-//----------------------------------------------------------------------------------------
-// Update mesh specific shader uniforms:
-static void updateShaderUniforms(
-		const ShaderProgram & shader,
-		const GeometryNode & node,
-		const glm::mat4 & viewMatrix
-) {
-
-	shader.enable();
-	{
-		//-- Set ModelView matrix:
-		GLint location = shader.getUniformLocation("ModelView");
-		mat4 modelView = viewMatrix * node.trans;
-		glUniformMatrix4fv(location, 1, GL_FALSE, value_ptr(modelView));
-		CHECK_GL_ERRORS;
-
-		//-- Set NormMatrix:
-		location = shader.getUniformLocation("NormalMatrix");
-		mat3 normalMatrix = glm::transpose(glm::inverse(mat3(modelView)));
-		glUniformMatrix3fv(location, 1, GL_FALSE, value_ptr(normalMatrix));
-		CHECK_GL_ERRORS;
-
-
-		//-- Set Material values:
-		location = shader.getUniformLocation("material.kd");
-		vec3 kd = node.material.kd;
-		glUniform3fv(location, 1, value_ptr(kd));
-		CHECK_GL_ERRORS;
-	}
-	shader.disable();
-
 }
 
 //----------------------------------------------------------------------------------------
@@ -379,6 +426,16 @@ static void updateShaderUniforms(
  * Called once per frame, after guiLogic().
  */
 void A3::draw() {
+
+	// Just draw the grid for now.
+
+	// glBindVertexArray( m_grid_vao );
+	// 	m_shader.enable();
+	// glDrawArrays( GL_LINES, 0, (3+DIM)*4 );
+	// 	m_shader.disable();
+	// glBindVertexArray( 0 );
+	// 	CHECK_GL_ERRORS;
+
 
 	glEnable( GL_DEPTH_TEST );
 	renderSceneGraph(*m_rootNode);
@@ -389,7 +446,7 @@ void A3::draw() {
 }
 
 //----------------------------------------------------------------------------------------
-void A3::renderSceneGraph(const SceneNode & root) {
+void A3::renderSceneGraph(SceneNode & root) {
 
 	// Bind the VAO once here, and reuse for all GeometryNode rendering below.
 	glBindVertexArray(m_vao_meshData);
@@ -407,24 +464,7 @@ void A3::renderSceneGraph(const SceneNode & root) {
 	// could put a set of mutually recursive functions in this class, which
 	// walk down the tree from nodes of different types.
 
-	for (const SceneNode * node : root.children) {
-
-		if (node->m_nodeType != NodeType::GeometryNode)
-			continue;
-
-		const GeometryNode * geometryNode = static_cast<const GeometryNode *>(node);
-
-		updateShaderUniforms(m_shader, *geometryNode, m_view);
-
-
-		// Get the BatchInfo corresponding to the GeometryNode's unique MeshId.
-		BatchInfo batchInfo = m_batchInfoMap[geometryNode->meshId];
-
-		//-- Now render the mesh:
-		m_shader.enable();
-		glDrawArrays(GL_TRIANGLES, batchInfo.startIndex, batchInfo.numIndices);
-		m_shader.disable();
-	}
+	root.render(m_shader, m_view, m_batchInfoMap);
 
 	glBindVertexArray(0);
 	CHECK_GL_ERRORS;
@@ -450,6 +490,14 @@ void A3::renderArcCircle() {
 
 	glBindVertexArray(0);
 	CHECK_GL_ERRORS;
+}
+
+//----------------------------------------------------------------------------------------
+/*
+ * Update model, called after mouse events
+ */
+void A3::updateModel() {
+	m_rootNode->translate(SCALE_FACTOR * m_controller->modelTranslater);
 }
 
 //----------------------------------------------------------------------------------------
@@ -486,6 +534,20 @@ bool A3::mouseMoveEvent (
 	bool eventHandled(false);
 
 	// Fill in with event handling code...
+	vec2 curMouseLoc (
+			(2.0f * xPos) / m_windowWidth - 1.0f,
+			1.0f - ( (2.0f * yPos) / m_windowHeight)
+	);
+
+	vec2 mouseLocChange = curMouseLoc - m_controller->lastMouseLoc;
+	m_controller->lastMouseLoc = curMouseLoc;
+
+	if (DEBUG_A3) {
+		cout << "Change: " << mouseLocChange << "Prev: " << m_controller->lastMouseLoc << endl;
+	}
+	m_controller->updateUponMouseEvent(mouseLocChange);
+
+	updateModel();
 
 	return eventHandled;
 }
@@ -502,6 +564,20 @@ bool A3::mouseButtonInputEvent (
 	bool eventHandled(false);
 
 	// Fill in with event handling code...
+	if (!ImGui::IsMouseHoveringAnyWindow()) {
+		if (actions == GLFW_PRESS) {
+			if (button == GLFW_MOUSE_BUTTON_LEFT) {
+				m_controller->mouseButtonPressed = Controller::MouseButton::LEFT;
+			} else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+				m_controller->mouseButtonPressed = Controller::MouseButton::RIGHT;
+			} else if (button = GLFW_MOUSE_BUTTON_MIDDLE) {
+				m_controller->mouseButtonPressed = Controller::MouseButton::MIDDLE;
+			}
+		}
+		if (actions == GLFW_RELEASE) {
+			m_controller->mouseButtonPressed = Controller::MouseButton::NONE;
+		}
+	}
 
 	return eventHandled;
 }
@@ -555,3 +631,52 @@ bool A3::keyInputEvent (
 
 	return eventHandled;
 }
+
+//----------------------------------------------------------------------------------------
+// Controller Definitions
+Controller::Controller()
+	: mode(1),
+		lastMouseLoc(0.0f, 0.0f)
+	{
+		reset();
+	}
+
+// Parse the mouse input into the controller
+void Controller::updateUponMouseEvent(vec2 mouseLocChange) {
+	if (pressed(Controller::MouseButton::NONE)) {
+		modelTranslater = vec3(0.0f);
+	}
+
+	if ((Controller::Mode) mode == Controller::Mode::POSITION)
+	{
+		if (pressed(Controller::MouseButton::LEFT)) {
+			modelTranslater.x = mouseLocChange.x;
+			modelTranslater.y = mouseLocChange.y;
+		}
+		if (pressed(Controller::MouseButton::MIDDLE)) {
+			modelTranslater.z = mouseLocChange.y;
+		}
+		// if (pressed(Controller::MouseButton::RIGHT)) {
+		// 	updateTrackBall(mouseLocChange);
+		// }
+	}
+
+	if (DEBUG_A3) {
+		print();
+	}
+}
+
+bool Controller::pressed(Controller::MouseButton m) {
+	return mouseButtonPressed == m;
+}
+
+void Controller::reset() {
+	modelTranslater = vec3(0.0f);
+}
+
+void Controller::print() {
+	cout << "modelTranslater: " << modelTranslater << endl;
+}
+
+//----------------------------------------------------------------------------------------
+// Helpers

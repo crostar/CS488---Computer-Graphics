@@ -11,6 +11,12 @@ public:
 		const std::string & name
 	);
 
+	virtual void renderRecur(
+		const ShaderProgram& shader,
+		const glm::mat4& view,
+		const BatchInfoMap& batchInfoMap,
+		glm::mat4 stackedTrans) override;
+
 	Material material;
 
 	// Mesh Identifier. This must correspond to an object name of

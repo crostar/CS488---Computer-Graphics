@@ -106,6 +106,20 @@ void SceneNode::translate(const glm::vec3& amount) {
 	trans = glm::translate(amount) * trans;
 }
 
+//---------------------------------------------------------------------------------------
+void SceneNode::render(const ShaderProgram& shader, const glm::mat4& view, const BatchInfoMap& batchInfoMap) {
+	this->renderRecur(shader, view, batchInfoMap, glm::mat4(1.0f));
+}
+
+//---------------------------------------------------------------------------------------
+void SceneNode::renderRecur(
+  const ShaderProgram& shader, const glm::mat4& view,
+  const BatchInfoMap& batchInfoMap, glm::mat4 stackedTrans)
+{
+  for (SceneNode * node : children) {
+    node->renderRecur(shader, view, batchInfoMap, stackedTrans * trans);
+  }
+}
 
 //---------------------------------------------------------------------------------------
 int SceneNode::totalSceneNodes() const {

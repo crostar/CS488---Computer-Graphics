@@ -3,12 +3,16 @@
 #pragma once
 
 #include "Material.hpp"
+#include "cs488-framework/MeshConsolidator.hpp"
+
 
 #include <glm/glm.hpp>
 
 #include <list>
 #include <string>
 #include <iostream>
+
+class ShaderProgram;
 
 enum class NodeType {
 	SceneNode,
@@ -23,16 +27,16 @@ public:
 	SceneNode(const SceneNode & other);
 
     virtual ~SceneNode();
-    
+
 	int totalSceneNodes() const;
-    
+
     const glm::mat4& get_transform() const;
     const glm::mat4& get_inverse() const;
-    
+
     void set_transform(const glm::mat4& m);
-    
+
     void add_child(SceneNode* child);
-    
+
     void remove_child(SceneNode* child);
 
 	//-- Transformations:
@@ -40,15 +44,21 @@ public:
     void scale(const glm::vec3& amount);
     void translate(const glm::vec3& amount);
 
+	void render(const ShaderProgram& shader, const glm::mat4& view, const BatchInfoMap& batchInfoMap);
+	virtual void renderRecur(
+		const ShaderProgram& shader,
+		const glm::mat4& view,
+		const BatchInfoMap& batchInfoMap,
+		glm::mat4 stackedTrans);
 
 	friend std::ostream & operator << (std::ostream & os, const SceneNode & node);
 
 	bool isSelected;
-    
+
     // Transformations
     glm::mat4 trans;
     glm::mat4 invtrans;
-    
+
     std::list<SceneNode*> children;
 
 	NodeType m_nodeType;
