@@ -8,6 +8,7 @@
 #include "cs488-framework/MeshConsolidator.hpp"
 
 #include "SceneNode.hpp"
+#include "TrackBall.hpp"
 
 #include <glm/glm.hpp>
 #include <memory>
@@ -37,12 +38,15 @@ public:
 public:
 	Controller();
 
-	void updateUponMouseEvent(glm::vec2 mouseLocChange);
+	void updateUponMouseMoveEvent(glm::vec2 mouseLocChange, float fDiameter, vec2 center);
+	void updateUponMouseInputEvent();
 	void print();
 	void reset();
 	bool pressed(MouseButton m);
+	vec2 pixelToFC(vec2 loc, vec2 center);
 
 	int mode;
+	bool picking;
 
 	// glm::mat4 modelFrame; // Last model frame matrix
 	// glm::vec3 modelScaler; // scaler factor in x,y,z directions
@@ -54,6 +58,7 @@ public:
 
 	MouseButton mouseButtonPressed; // current mouse button pressed
 	glm::vec2 lastMouseLoc; // location of the mouse in the last frame
+	std::unique_ptr<TrackBall> m_trackBall;
 };
 
 class A3 : public CS488Window {
@@ -95,6 +100,7 @@ protected:
 	void renderSceneGraph(SceneNode &node);
 	void renderArcCircle();
 	void updateModel();
+
 
 	glm::mat4 m_perpsective;
 	glm::mat4 m_view;

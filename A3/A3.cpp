@@ -310,7 +310,7 @@ void A3::initPerspectiveMatrix()
 
 //----------------------------------------------------------------------------------------
 void A3::initViewMatrix() {
-	m_view = glm::lookAt(vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 0.0f, -1.0f),
+	m_view = glm::lookAt(vec3(0.0f, 0.0f, 3.0f), vec3(0.0f, 0.0f, -1.0f),
 			vec3(0.0f, 1.0f, 0.0f));
 }
 
@@ -318,7 +318,7 @@ void A3::initViewMatrix() {
 void A3::initLightSources() {
 	// World-space position
 	m_light.position = vec3(10.0f, 10.0f, 10.0f);
-	m_light.rgbIntensity = vec3(0.0f); // light
+	m_light.rgbIntensity = vec3(2.0f); // light
 }
 
 //----------------------------------------------------------------------------------------
@@ -497,6 +497,7 @@ void A3::renderArcCircle() {
  * Update model, called after mouse events
  */
 void A3::updateModel() {
+	m_rootNode->set_transform(m_rootNode->get_transform() * m_controller->m_trackBall->m_rotMat);
 	m_rootNode->translate(SCALE_FACTOR * m_controller->modelTranslater);
 }
 
@@ -533,20 +534,18 @@ bool A3::mouseMoveEvent (
 ) {
 	bool eventHandled(false);
 
-	// Fill in with event handling code...
-	vec2 curMouseLoc (
-			(2.0f * xPos) / m_windowWidth - 1.0f,
-			1.0f - ( (2.0f * yPos) / m_windowHeight)
-	);
-
-	vec2 mouseLocChange = curMouseLoc - m_controller->lastMouseLoc;
-	m_controller->lastMouseLoc = curMouseLoc;
-
 	if (DEBUG_A3) {
-		cout << "Change: " << mouseLocChange << "Prev: " << m_controller->lastMouseLoc << endl;
+		cout << "Prev: " << m_controller->lastMouseLoc << " Cur: " << vec2(xPos, yPos) << endl;
 	}
-	m_controller->updateUponMouseEvent(mouseLocChange);
 
+	float fDiameter = (m_windowWidth < m_windowHeight) ? m_windowWidth * 0.5 : m_windowHeight * 0.5;
+	vec2 center(m_windowWidth / 2.0f, m_windowHeight / 2.0f);
+
+	// Update controller
+	m_controller->updateUponMouseMoveEvent(vec2(xPos, yPos), fDiameter, center);
+	m_controller->lastMouseLoc = vec2(xPos, yPos);
+
+	// Update model in terms of controller
 	updateModel();
 
 	return eventHandled;
@@ -578,6 +577,8 @@ bool A3::mouseButtonInputEvent (
 			m_controller->mouseButtonPressed = Controller::MouseButton::NONE;
 		}
 	}
+
+	m_controller->updateUponMouseInputEvent();
 
 	return eventHandled;
 }
@@ -636,19 +637,25 @@ bool A3::keyInputEvent (
 // Controller Definitions
 Controller::Controller()
 	: mode(1),
-		lastMouseLoc(0.0f, 0.0f)
+		picking(false),
+		lastMouseLoc(0.0f, 0.0f),
+		m_trackBall(new TrackBall())
 	{
 		reset();
 	}
 
 // Parse the mouse input into the controller
-void Controller::updateUponMouseEvent(vec2 mouseLocChange) {
+void Controller::updateUponMouseMoveEvent(vec2 mousePos, float fDiameter, vec2 center) {
 	if (pressed(Controller::MouseButton::NONE)) {
 		modelTranslater = vec3(0.0f);
+		m_trackBall->reset();
 	}
 
 	if ((Controller::Mode) mode == Controller::Mode::POSITION)
 	{
+		// Fill in with event handling code...
+		vec2 mouseLocChange = pixelToFC(mousePos, center) - pixelToFC(lastMouseLoc, center);
+
 		if (pressed(Controller::MouseButton::LEFT)) {
 			modelTranslater.x = mouseLocChange.x;
 			modelTranslater.y = mouseLocChange.y;
@@ -656,13 +663,26 @@ void Controller::updateUponMouseEvent(vec2 mouseLocChange) {
 		if (pressed(Controller::MouseButton::MIDDLE)) {
 			modelTranslater.z = mouseLocChange.y;
 		}
-		// if (pressed(Controller::MouseButton::RIGHT)) {
-		// 	updateTrackBall(mouseLocChange);
-		// }
+		if (pressed(Controller::MouseButton::RIGHT)) {
+			m_trackBall->update(mousePos - center, lastMouseLoc - center, fDiameter);
+		}
 	}
 
 	if (DEBUG_A3) {
 		print();
+	}
+}
+
+void A3::updateUponMouseInputEvent() {
+	if (pressed(Controller::MouseButton::NONE)) {
+
+	}
+
+	if ((Controller::Mode) mode == Controller::Mode::JOINTS) {
+		// Picking mode
+		if (pressed(Controller::MouseButton::LEFT)) {
+			picking = true;
+		}
 	}
 }
 
@@ -680,3 +700,13 @@ void Controller::print() {
 
 //----------------------------------------------------------------------------------------
 // Helpers
+vec2 Controller::pixelToFC(vec2 loc, vec2 center) {
+	vec2 res (
+			loc.x / center.x - 1.0f,
+			1.0f - ( loc.y / center.y )
+	);
+	if (DEBUG_A3) {
+		cout << "Frame coordinate: " << res << endl;
+	}
+	return res;
+}

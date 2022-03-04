@@ -57,6 +57,7 @@ void GeometryNode::renderRecur(
 	const BatchInfoMap& batchInfoMap, glm::mat4 stackedTrans)
 {
 	glm::mat4 originalTrans = trans;
+	// trans = trans * stackedTrans;
 	trans = stackedTrans * trans;
 	updateShaderUniforms(shader, *this, view);
 	trans = originalTrans;
@@ -70,6 +71,7 @@ void GeometryNode::renderRecur(
 	shader.disable();
 
 	for (SceneNode * node : children) {
+		// node->renderRecur(shader, view, batchInfoMap, trans * stackedTrans);
 		node->renderRecur(shader, view, batchInfoMap, stackedTrans * trans);
 	}
 }
