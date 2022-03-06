@@ -13,6 +13,24 @@
 #include <iostream>
 
 class ShaderProgram;
+class Operation;
+class OperationStack;
+
+class RenderParams {
+public:
+	RenderParams(
+		const ShaderProgram* shader,
+		const glm::mat4 view,
+		const BatchInfoMap* batchInfoMap,
+		bool isPicking
+	) : m_shader(shader), m_view(view), m_batchInfoMap(batchInfoMap),
+			m_isPicking(isPicking) {}
+
+	const ShaderProgram* m_shader;
+	const glm::mat4 m_view;
+	const BatchInfoMap* m_batchInfoMap;
+	bool m_isPicking;
+};
 
 enum class NodeType {
 	SceneNode,
@@ -44,12 +62,15 @@ public:
     void scale(const glm::vec3& amount);
     void translate(const glm::vec3& amount);
 
-	void render(const ShaderProgram& shader, const glm::mat4& view, const BatchInfoMap& batchInfoMap);
+	void render(RenderParams params);
+
 	virtual void renderRecur(
-		const ShaderProgram& shader,
-		const glm::mat4& view,
-		const BatchInfoMap& batchInfoMap,
+		RenderParams params,
 		glm::mat4 stackedTrans);
+
+	bool isHeadJoint() {
+		return m_name == "head-joint";
+	}
 
 	friend std::ostream & operator << (std::ostream & os, const SceneNode & node);
 
@@ -69,4 +90,61 @@ public:
 private:
 	// The number of SceneNode instances.
 	static unsigned int nodeInstanceCount;
+};
+
+
+class Operation {
+public:
+	Operation(std::vector<SceneNode*>& nodes, glm::vec2 rotateAngle)
+		: m_node(nodes), m_rotateAngle(rotateAngle) {
+			for (auto node : m_nodes) {
+				transBefore.push_back(node->trans);
+			}
+		}
+
+	void execute() {
+		for (auto node : m_nodes) {
+			node->rotate('x', m_rotateAngle.x);
+			node->rotate('y', m_rotateAngle.y);
+		}
+	}
+
+	void undo() {
+		for (int i=0; i<m_nodes.size(); i++) {
+			m_nodes[i]->trans = transBefore[i];
+		}
+	}
+
+	void setGroup(size_t group) {
+		m_group = group;
+	}
+
+	size_t groupID() {
+		return m_group;
+	}
+
+	void addRotation(glm::vec2 rotateAngle) {
+		m_rotateAngle += rotateAngle;
+	}
+
+private:
+	std::vector<SceneNode*> m_nodes;
+	glm::vec2 m_rotateAngle;
+	std::vector<glm::mat4> transBefore;
+	size_t m_group;
+};
+
+class OperationStack {
+public:
+	OperationStack() { clear(); }
+	void undo();
+	void redo();
+	void addOperations(std::vector<Operation>& ops);
+	void clear();
+	// Compress the most recent 
+	void compressTop();
+
+	std::vector<Operation> m_operations;
+	size_t m_next;
+	size_t m_size;
 };

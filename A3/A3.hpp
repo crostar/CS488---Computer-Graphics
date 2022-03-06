@@ -2,6 +2,9 @@
 
 #pragma once
 
+#include <memory>
+#include <set>
+
 #include "cs488-framework/CS488Window.hpp"
 #include "cs488-framework/OpenGLImport.hpp"
 #include "cs488-framework/ShaderProgram.hpp"
@@ -11,7 +14,7 @@
 #include "TrackBall.hpp"
 
 #include <glm/glm.hpp>
-#include <memory>
+
 
 #define DEBUG_A3 1
 
@@ -38,7 +41,9 @@ public:
 public:
 	Controller();
 
-	void updateUponMouseMoveEvent(glm::vec2 mouseLocChange, float fDiameter, vec2 center);
+	void updateUponMouseMoveEvent(
+		glm::vec2 mouseLocChange, float fDiameter, vec2 center,
+		std::unordered_map<unsigned int, SceneNode*> & nodeMap);
 	void updateUponMouseInputEvent();
 	void print();
 	void reset();
@@ -53,22 +58,22 @@ public:
 	// glm::vec3 modelRotateAngle; // rotation angle around x,y,z axis
 	glm::vec3 modelTranslater; // translate distance in x,y,z directions
 
+
 	// glm::vec3 viewRotateAngle; // rotation angle around x,y,z axis
 	// glm::vec3 viewTranslater; // translate distance in x,y,z directions
 
-	MouseButton mouseButtonPressed; // current mouse button pressed
+	std::set<MouseButton> mouseButtonPressed; // current mouse button pressed
 	glm::vec2 lastMouseLoc; // location of the mouse in the last frame
 	std::unique_ptr<TrackBall> m_trackBall;
+
+	std::unique_ptr<OperationStack> m_operations;
 };
+
 
 class A3 : public CS488Window {
 public:
 	A3(const std::string & luaSceneFile);
 	virtual ~A3();
-
-	void initGrid();
-	GLuint m_grid_vao;
-	GLuint m_grid_vbo;
 
 protected:
 	virtual void init() override;
@@ -93,6 +98,8 @@ protected:
 	void mapVboDataToVertexShaderInputLocations();
 	void initViewMatrix();
 	void initLightSources();
+	void buildNodeMaps();
+	void initFbo();
 
 	void initPerspectiveMatrix();
 	void uploadCommonSceneUniforms();
@@ -100,6 +107,7 @@ protected:
 	void renderSceneGraph(SceneNode &node);
 	void renderArcCircle();
 	void updateModel();
+	void buildNodeMapsRecur(SceneNode* root);
 
 
 	glm::mat4 m_perpsective;
@@ -121,6 +129,9 @@ protected:
 	GLint m_arc_positionAttribLocation;
 	ShaderProgram m_shader_arcCircle;
 
+	ShaderProgram m_shader_picking;
+	GLuint m_picking_fbo;
+
 	// BatchInfoMap is an associative container that maps a unique MeshId to a BatchInfo
 	// object. Each BatchInfo object contains an index offset and the number of indices
 	// required to render the mesh with identifier MeshId.
@@ -131,4 +142,11 @@ protected:
 	std::shared_ptr<SceneNode> m_rootNode;
 
 	std::unique_ptr<Controller> m_controller;
+
+	// Maps node id to its closest upper joint
+	std::unordered_map<unsigned int, SceneNode*> m_upperJointMap;
+	// Maps node id to its node pointer
+	std::unordered_map<unsigned int, SceneNode*> m_nodeMap;
+	// Maps joint to all the geometry node it controls
+	std::unordered_map<unsigned int, std::list<SceneNode*>> m_jointGroupMap;
 };

@@ -12,9 +12,7 @@ public:
 	);
 
 	virtual void renderRecur(
-		const ShaderProgram& shader,
-		const glm::mat4& view,
-		const BatchInfoMap& batchInfoMap,
+		RenderParams params,
 		glm::mat4 stackedTrans) override;
 
 	Material material;

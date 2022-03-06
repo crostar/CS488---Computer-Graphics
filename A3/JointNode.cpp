@@ -29,10 +29,10 @@ void JointNode::set_joint_y(double min, double init, double max) {
 
 //---------------------------------------------------------------------------------------
 void JointNode::renderRecur(
-	const ShaderProgram& shader, const glm::mat4& view,
-	const BatchInfoMap& batchInfoMap, glm::mat4 stackedTrans)
+	RenderParams params,
+	glm::mat4 stackedTrans)
 {
 	for (SceneNode * node : children) {
-		node->renderRecur(shader, view, batchInfoMap, stackedTrans * trans);
+		node->renderRecur(params, stackedTrans * trans);
 	}
 }

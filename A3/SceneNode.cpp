@@ -107,17 +107,18 @@ void SceneNode::translate(const glm::vec3& amount) {
 }
 
 //---------------------------------------------------------------------------------------
-void SceneNode::render(const ShaderProgram& shader, const glm::mat4& view, const BatchInfoMap& batchInfoMap) {
-	this->renderRecur(shader, view, batchInfoMap, glm::mat4(1.0f));
+void SceneNode::render(RenderParams params)
+{
+	this->renderRecur(params, glm::mat4(1.0f));
 }
 
 //---------------------------------------------------------------------------------------
 void SceneNode::renderRecur(
-  const ShaderProgram& shader, const glm::mat4& view,
-  const BatchInfoMap& batchInfoMap, glm::mat4 stackedTrans)
+  RenderParams params,
+  glm::mat4 stackedTrans)
 {
   for (SceneNode * node : children) {
-    node->renderRecur(shader, view, batchInfoMap, stackedTrans * trans);
+    node->renderRecur(params, stackedTrans * trans);
   }
 }
 
@@ -148,4 +149,55 @@ std::ostream & operator << (std::ostream & os, const SceneNode & node) {
 	os << "]";
 
 	return os;
+}
+
+
+//---------------------------------------------------------------------------------------
+void OperationStack::addOperations(std::vector<Operation>& ops) {
+  cout << "Adding operations of size " << ops.size()
+    << ", current next/top: " << m_next << ", " << endl;
+  size_t nextGroupId = m_next == 0 ? 0 : m_operations[m_next-1].groupID() + 1;
+  for (auto op : ops) {
+    op.setGroup(nextGroupId);
+    op.execute();
+  }
+  m_operations.insert(std::begin(m_operations) + m_next, std::begin(ops), std::end(ops));
+  m_next += ops.size();
+  cout << "Updated next/top: " << m_next << ", " << endl;
+}
+
+void OperationStack::undo() {
+  cout << "Undoing, current next/top: " << m_next << ", " << endl;
+  if (m_next == 0) {
+    cout << "Cannot undo" << endl;
+    return;
+  }
+  size_t topGroupId = m_operations[m_next-1].groupID();
+  for (; m_operations[m_next-1].groupID() == topGroupId; m_next--) {
+    m_operations[m_next-1].undo();
+  }
+  cout << "Updated next/top: " << m_next << ", " << endl;
+}
+
+void OperationStack::redo() {
+  cout << "Redoing, current next/top: " << m_next << ", " << endl;
+  if (m_next == m_size) {
+    cout << "Cannot redo" << endl;
+    return;
+  }
+  size_t nextGroupId = m_operations[m_next].groupID();
+  for (; m_next != m_size && m_operations[m_next].groupID() == nextGroupId; m_next++) {
+    m_operations[m_next].execute();
+  }
+  cout << "Updated next/top: " << m_next << ", " << endl;
+}
+
+void OperationStack::compressTop() {
+
+}
+
+void OperationStack::clear() {
+  m_operations.clear();
+  m_next = 0;
+  m_size = 0;
 }

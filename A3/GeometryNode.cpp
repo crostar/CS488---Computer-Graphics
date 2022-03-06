@@ -12,33 +12,52 @@
 using namespace glm;
 
 void updateShaderUniforms(
-		const ShaderProgram & shader,
-		const GeometryNode& node,
-		const glm::mat4 & viewMatrix
+	RenderParams params,
+	GeometryNode & node,
+	glm::mat4 stackedTrans
 ) {
+	params.m_shader->enable();
 
-	shader.enable();
-	{
-		//-- Set ModelView matrix:
-		GLint location = shader.getUniformLocation("ModelView");
-		mat4 modelView = viewMatrix * node.trans;
-		glUniformMatrix4fv(location, 1, GL_FALSE, value_ptr(modelView));
+	//-- Set ModelView matrix:
+	GLint location = params.m_shader->getUniformLocation("ModelView");
+	mat4 modelView = params.m_view * stackedTrans * node.trans;
+	glUniformMatrix4fv(location, 1, GL_FALSE, value_ptr(modelView));
+	CHECK_GL_ERRORS;
+
+	if( params.m_isPicking ) {
+		uint id = node.m_nodeId;
+		// float r = float(id&0xff) / 255.0f;
+		float r = float(id&0xff) / 255.0f;
+		float g = float((id>>8)&0xff) / 255.0f;
+		float b = float((id>>16)&0xff) / 255.0f;
+
+		// std::cout << "ID: " << node.m_nodeId << " rgb: ("
+		//  	<< r*255.0f << ", " << g*255.0f << "," << b*255.0f
+		// 	<< ")" << std::endl;
+
+		location = params.m_shader->getUniformLocation("material.kd");
+		glUniform3f( location, r, g, b );
 		CHECK_GL_ERRORS;
-
+	} else {
 		//-- Set NormMatrix:
-		location = shader.getUniformLocation("NormalMatrix");
+		location = params.m_shader->getUniformLocation("NormalMatrix");
 		mat3 normalMatrix = glm::transpose(glm::inverse(mat3(modelView)));
 		glUniformMatrix3fv(location, 1, GL_FALSE, value_ptr(normalMatrix));
 		CHECK_GL_ERRORS;
 
-
 		//-- Set Material values:
-		location = shader.getUniformLocation("material.kd");
-		vec3 kd = node.material.kd;
+		location = params.m_shader->getUniformLocation("material.kd");
+		vec3 kd;
+		if (node.isSelected) {
+			kd = glm::vec3( 1.0, 1.0, 0.0 );
+		} else {
+			kd = node.material.kd;
+		}
 		glUniform3fv(location, 1, value_ptr(kd));
 		CHECK_GL_ERRORS;
 	}
-	shader.disable();
+
+	params.m_shader->disable();
 }
 
 //---------------------------------------------------------------------------------------
@@ -53,25 +72,23 @@ GeometryNode::GeometryNode(
 }
 
 void GeometryNode::renderRecur(
-	const ShaderProgram& shader, const glm::mat4& view,
-	const BatchInfoMap& batchInfoMap, glm::mat4 stackedTrans)
+	RenderParams params,
+	glm::mat4 stackedTrans)
 {
 	glm::mat4 originalTrans = trans;
 	// trans = trans * stackedTrans;
-	trans = stackedTrans * trans;
-	updateShaderUniforms(shader, *this, view);
-	trans = originalTrans;
+	updateShaderUniforms(params, *this, stackedTrans);
 
 	// Get the BatchInfo corresponding to the GeometryNode's unique MeshId.
-	BatchInfo batchInfo = batchInfoMap.at(meshId);
+	BatchInfo batchInfo = params.m_batchInfoMap->at(meshId);
 
 	//-- Now render the mesh:
-	shader.enable();
+	params.m_shader->enable();
 	glDrawArrays(GL_TRIANGLES, batchInfo.startIndex, batchInfo.numIndices);
-	shader.disable();
+	params.m_shader->disable();
 
 	for (SceneNode * node : children) {
 		// node->renderRecur(shader, view, batchInfoMap, trans * stackedTrans);
-		node->renderRecur(shader, view, batchInfoMap, stackedTrans * trans);
+		node->renderRecur(params, stackedTrans * trans);
 	}
 }

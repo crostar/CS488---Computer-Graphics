@@ -14,6 +14,7 @@ using namespace std;
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/io.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <algorithm>
 
 using namespace glm;
 
@@ -47,59 +48,6 @@ A3::~A3()
 
 }
 
-
-void A3::initGrid()
-{
-	size_t sz = 3 * 2 * 2 * (DIM+3);
-
-	float *verts = new float[ sz ];
-	size_t ct = 0;
-	for( int idx = 0; idx < DIM+3; ++idx ) {
-		verts[ ct ] = -1;
-		verts[ ct+1 ] = 0;
-		verts[ ct+2 ] = idx-1;
-		verts[ ct+3 ] = DIM+1;
-		verts[ ct+4 ] = 0;
-		verts[ ct+5 ] = idx-1;
-		ct += 6;
-
-		verts[ ct ] = idx-1;
-		verts[ ct+1 ] = 0;
-		verts[ ct+2 ] = -1;
-		verts[ ct+3 ] = idx-1;
-		verts[ ct+4 ] = 0;
-		verts[ ct+5 ] = DIM+1;
-		ct += 6;
-	}
-
-	// Create the vertex array to record buffer assignments.
-	glGenVertexArrays( 1, &m_grid_vao );
-	glBindVertexArray( m_grid_vao );
-
-	// Create the cube vertex buffer
-	glGenBuffers( 1, &m_grid_vbo );
-	glBindBuffer( GL_ARRAY_BUFFER, m_grid_vbo );
-	glBufferData( GL_ARRAY_BUFFER, sz*sizeof(float),
-		verts, GL_STATIC_DRAW );
-
-	// Specify the means of extracting the position values properly.
-	GLint posAttrib = m_shader.getAttribLocation( "position" );
-	glEnableVertexAttribArray( posAttrib );
-	glVertexAttribPointer( posAttrib, 3, GL_FLOAT, GL_FALSE, 0, nullptr );
-
-	// Reset state to prevent rogue code from messing with *my*
-	// stuff!
-	glBindVertexArray( 0 );
-	glBindBuffer( GL_ARRAY_BUFFER, 0 );
-	glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
-
-	// OpenGL has the buffer now, there's no need for us to keep a copy.
-	delete [] verts;
-
-	CHECK_GL_ERRORS;
-}
-
-
 //----------------------------------------------------------------------------------------
 /*
  * Called once, at program start.
@@ -114,6 +62,8 @@ void A3::init()
 	glGenVertexArrays(1, &m_vao_arcCircle);
 	glGenVertexArrays(1, &m_vao_meshData);
 	enableVertexShaderInputSlots();
+
+	initFbo();
 
 	processLuaSceneFile(m_luaSceneFile);
 
@@ -131,7 +81,6 @@ void A3::init()
 	// Acquire the BatchInfoMap from the MeshConsolidator.
 	meshConsolidator->getBatchInfoMap(m_batchInfoMap);
 
-	initGrid();
 	// Take all vertex data within the MeshConsolidator and upload it to VBOs on the GPU.
 	uploadVertexDataToVbos(*meshConsolidator);
 
@@ -143,7 +92,7 @@ void A3::init()
 
 	initLightSources();
 
-
+	buildNodeMaps();
 	// Exiting the current scope calls delete automatically on meshConsolidator freeing
 	// all vertex data resources.  This is fine since we already copied this data to
 	// VBOs on the GPU.  We have no use for storing vertex data on the CPU side beyond
@@ -178,6 +127,17 @@ void A3::createShaderProgram()
 	m_shader_arcCircle.attachVertexShader( getAssetFilePath("arc_VertexShader.vs").c_str() );
 	m_shader_arcCircle.attachFragmentShader( getAssetFilePath("arc_FragmentShader.fs").c_str() );
 	m_shader_arcCircle.link();
+
+	m_shader_picking.generateProgramObject();
+	m_shader_picking.attachVertexShader( getAssetFilePath("pick_VertexShader.vs").c_str() );
+	m_shader_picking.attachFragmentShader( getAssetFilePath("pick_FragmentShader.fs").c_str() );
+	m_shader_picking.link();
+}
+
+//----------------------------------------------------------------------------------------
+void A3::initFbo()
+{
+	glGenFramebuffers(1, &m_picking_fbo);
 }
 
 //----------------------------------------------------------------------------------------
@@ -322,33 +282,110 @@ void A3::initLightSources() {
 }
 
 //----------------------------------------------------------------------------------------
-void A3::uploadCommonSceneUniforms() {
-	m_shader.enable();
-	{
-		//-- Set Perpsective matrix uniform for the scene:
-		GLint location = m_shader.getUniformLocation("Perspective");
-		glUniformMatrix4fv(location, 1, GL_FALSE, value_ptr(m_perpsective));
-		CHECK_GL_ERRORS;
-
-
-		//-- Set LightSource uniform for the scene:
-		{
-			location = m_shader.getUniformLocation("light.position");
-			glUniform3fv(location, 1, value_ptr(m_light.position));
-			location = m_shader.getUniformLocation("light.rgbIntensity");
-			glUniform3fv(location, 1, value_ptr(m_light.rgbIntensity));
-			CHECK_GL_ERRORS;
-		}
-
-		//-- Set background light ambient intensity
-		{
-			location = m_shader.getUniformLocation("ambientIntensity");
-			vec3 ambientIntensity(0.25f);
-			glUniform3fv(location, 1, value_ptr(ambientIntensity));
-			CHECK_GL_ERRORS;
+void A3::buildNodeMaps() {
+	SceneNode* root = m_rootNode.get();
+	buildNodeMapsRecur(root);
+	for (auto it = m_upperJointMap.begin(); it != m_upperJointMap.end(); it++) {
+		if (it->second == nullptr) {
+			m_upperJointMap.erase(it);
 		}
 	}
-	m_shader.disable();
+
+	if (DEBUG_A3) {
+		cout << "Joint map built: " << m_upperJointMap.size() << endl;
+		for (auto kv : m_upperJointMap) {
+			std::cout << "( " << kv.first << "," << kv.second << ")" << endl;
+		}
+	}
+
+	for (auto it = m_upperJointMap.begin(); it != m_upperJointMap.end(); it++) {
+		if (m_jointGroupMap.count(it->second->m_nodeId) != 0) {
+			m_jointGroupMap[it->second->m_nodeId].push_back(m_nodeMap[it->first]);
+		} else {
+			m_jointGroupMap[it->second->m_nodeId] = std::list<SceneNode*>({m_nodeMap[it->first]});
+		}
+	}
+
+	if (DEBUG_A3) {
+		cout << "Joint group map built: " << m_jointGroupMap.size() << endl;
+		for (auto kv : m_jointGroupMap) {
+			std::cout << "Joint " << m_nodeMap[kv.first]->m_name << "(" << kv.first << "):" << endl;
+			for (auto node : kv.second) {
+				std::cout << "  " << node->m_name << "(" << node << ")" << endl;
+			}
+		}
+	}
+}
+
+// Assumption: A scene node does not have any GeometryNode child
+void A3::buildNodeMapsRecur(SceneNode* root) {
+	bool isSceneNode = false;
+	if (dynamic_cast<JointNode*>(root) != nullptr) {
+		m_upperJointMap[root->m_nodeId] = root;
+		cout << "Upper joint of " << root->m_name << "(" << root->m_nodeId << ")" << ": " << root->m_name << endl;
+	} else if (dynamic_cast<GeometryNode*>(root) != nullptr) {
+		if (DEBUG_A3) {
+			cout << "Geo node has to exist in map already " <<
+				m_upperJointMap[root->m_nodeId] << endl;
+		}
+	} else {
+		isSceneNode = true;
+	}
+
+	if (!isSceneNode) {
+		for (auto node : root->children) {
+			m_upperJointMap[node->m_nodeId] = m_upperJointMap[root->m_nodeId];
+			cout << "Upper joint of " << node->m_name << "(" << node->m_nodeId << ")"
+				<< ": " << m_upperJointMap[root->m_nodeId]->m_name << endl;
+		}
+	}
+
+	m_nodeMap[root->m_nodeId] = root;
+
+	for (auto node : root->children) {
+		buildNodeMapsRecur(node);
+	}
+}
+
+//----------------------------------------------------------------------------------------
+void A3::uploadCommonSceneUniforms() {
+	// if (m_controller->picking) {
+		m_shader_picking.enable();
+		{
+			//-- Set Perpsective matrix uniform for the scene:
+			GLint location = m_shader_picking.getUniformLocation("Perspective");
+			glUniformMatrix4fv(location, 1, GL_FALSE, value_ptr(m_perpsective));
+			CHECK_GL_ERRORS;
+		}
+		m_shader_picking.disable();
+	// } else {
+		m_shader.enable();
+		{
+			//-- Set Perpsective matrix uniform for the scene:
+			GLint location = m_shader.getUniformLocation("Perspective");
+			glUniformMatrix4fv(location, 1, GL_FALSE, value_ptr(m_perpsective));
+			CHECK_GL_ERRORS;
+
+
+			//-- Set LightSource uniform for the scene:
+			{
+				location = m_shader.getUniformLocation("light.position");
+				glUniform3fv(location, 1, value_ptr(m_light.position));
+				location = m_shader.getUniformLocation("light.rgbIntensity");
+				glUniform3fv(location, 1, value_ptr(m_light.rgbIntensity));
+				CHECK_GL_ERRORS;
+			}
+
+			//-- Set background light ambient intensity
+			{
+				location = m_shader.getUniformLocation("ambientIntensity");
+				vec3 ambientIntensity(0.25f);
+				glUniform3fv(location, 1, value_ptr(ambientIntensity));
+				CHECK_GL_ERRORS;
+			}
+		}
+		m_shader.disable();
+	// }
 }
 
 //----------------------------------------------------------------------------------------
@@ -427,22 +464,12 @@ void A3::guiLogic()
  */
 void A3::draw() {
 
-	// Just draw the grid for now.
-
-	// glBindVertexArray( m_grid_vao );
-	// 	m_shader.enable();
-	// glDrawArrays( GL_LINES, 0, (3+DIM)*4 );
-	// 	m_shader.disable();
-	// glBindVertexArray( 0 );
-	// 	CHECK_GL_ERRORS;
-
+	glDisable( GL_DEPTH_TEST );
+	renderArcCircle();
 
 	glEnable( GL_DEPTH_TEST );
 	renderSceneGraph(*m_rootNode);
 
-
-	glDisable( GL_DEPTH_TEST );
-	renderArcCircle();
 }
 
 //----------------------------------------------------------------------------------------
@@ -451,20 +478,17 @@ void A3::renderSceneGraph(SceneNode & root) {
 	// Bind the VAO once here, and reuse for all GeometryNode rendering below.
 	glBindVertexArray(m_vao_meshData);
 
-	// This is emphatically *not* how you should be drawing the scene graph in
-	// your final implementation.  This is a non-hierarchical demonstration
-	// in which we assume that there is a list of GeometryNodes living directly
-	// underneath the root node, and that we can draw them in a loop.  It's
-	// just enough to demonstrate how to get geometry and materials out of
-	// a GeometryNode and onto the screen.
+	// cout << "Rendering Scene Graph, picking: " << m_controller->picking << endl;
+	RenderParams params(
+		m_controller->picking ? &m_shader_picking : &m_shader,
+		m_view, &m_batchInfoMap, m_controller->picking);
 
-	// You'll want to turn this into recursive code that walks over the tree.
-	// You can do that by putting a method in SceneNode, overridden in its
-	// subclasses, that renders the subtree rooted at every node.  Or you
-	// could put a set of mutually recursive functions in this class, which
-	// walk down the tree from nodes of different types.
-
-	root.render(m_shader, m_view, m_batchInfoMap);
+	// if (m_controller->picking) {
+	// 	glBindFramebuffer(GL_FRAMEBUFFER, m_picking_fbo);
+	// } else {
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	// }
+	root.render(params);
 
 	glBindVertexArray(0);
 	CHECK_GL_ERRORS;
@@ -507,7 +531,7 @@ void A3::updateModel() {
  */
 void A3::cleanup()
 {
-
+	glDeleteFramebuffers(1, &m_picking_fbo);
 }
 
 //----------------------------------------------------------------------------------------
@@ -534,15 +558,15 @@ bool A3::mouseMoveEvent (
 ) {
 	bool eventHandled(false);
 
-	if (DEBUG_A3) {
-		cout << "Prev: " << m_controller->lastMouseLoc << " Cur: " << vec2(xPos, yPos) << endl;
-	}
+	// if (DEBUG_A3) {
+	// 	cout << "Prev: " << m_controller->lastMouseLoc << " Cur: " << vec2(xPos, yPos) << endl;
+	// }
 
 	float fDiameter = (m_windowWidth < m_windowHeight) ? m_windowWidth * 0.5 : m_windowHeight * 0.5;
 	vec2 center(m_windowWidth / 2.0f, m_windowHeight / 2.0f);
 
 	// Update controller
-	m_controller->updateUponMouseMoveEvent(vec2(xPos, yPos), fDiameter, center);
+	m_controller->updateUponMouseMoveEvent(vec2(xPos, yPos), fDiameter, center, m_nodeMap);
 	m_controller->lastMouseLoc = vec2(xPos, yPos);
 
 	// Update model in terms of controller
@@ -566,19 +590,79 @@ bool A3::mouseButtonInputEvent (
 	if (!ImGui::IsMouseHoveringAnyWindow()) {
 		if (actions == GLFW_PRESS) {
 			if (button == GLFW_MOUSE_BUTTON_LEFT) {
-				m_controller->mouseButtonPressed = Controller::MouseButton::LEFT;
+				m_controller->mouseButtonPressed.insert(Controller::MouseButton::LEFT);
 			} else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
-				m_controller->mouseButtonPressed = Controller::MouseButton::RIGHT;
+				m_controller->mouseButtonPressed.insert(Controller::MouseButton::RIGHT);
 			} else if (button = GLFW_MOUSE_BUTTON_MIDDLE) {
-				m_controller->mouseButtonPressed = Controller::MouseButton::MIDDLE;
+				m_controller->mouseButtonPressed.insert(Controller::MouseButton::MIDDLE);
 			}
 		}
 		if (actions == GLFW_RELEASE) {
-			m_controller->mouseButtonPressed = Controller::MouseButton::NONE;
+			if (button == GLFW_MOUSE_BUTTON_LEFT) {
+				m_controller->mouseButtonPressed.erase(Controller::MouseButton::LEFT);
+			} else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+				m_controller->mouseButtonPressed.erase(Controller::MouseButton::RIGHT);
+			} else if (button = GLFW_MOUSE_BUTTON_MIDDLE) {
+				m_controller->mouseButtonPressed.erase(Controller::MouseButton::MIDDLE);
+			}
 		}
 	}
 
-	m_controller->updateUponMouseInputEvent();
+	// Handle picking
+	double xpos = 0.0f, ypos = 0.0f;
+	glfwGetCursorPos( m_window, &xpos, &ypos );
+	if (
+		(Controller::Mode) m_controller->mode == Controller::Mode::JOINTS &&
+		button == GLFW_MOUSE_BUTTON_LEFT &&
+		actions == GLFW_PRESS)
+	{
+		m_controller->picking = true;
+		uploadCommonSceneUniforms();
+		glClearColor(1.0, 1.0, 1.0, 1.0 );
+		glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+		glClearColor(0.85, 0.85, 0.85, 1.0);
+
+		draw();
+
+		// Ugly -- FB coordinates might be different than Window coordinates
+		// (e.g., on a retina display).  Must compensate.
+		xpos *= double(m_framebufferWidth) / double(m_windowWidth);
+		// WTF, don't know why I have to measure y relative to the bottom of
+		// the window in this case.
+		ypos = m_windowHeight - ypos;
+		ypos *= double(m_framebufferHeight) / double(m_windowHeight);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		GLubyte buffer[ 4 ] = { 0, 0, 0, 0 };
+		// A bit ugly -- don't want to swap the just-drawn false colours
+		// to the screen, so read from the back buffer.
+		glReadBuffer( GL_BACK );
+		// Actually read the pixel at the mouse location.
+		glReadPixels( int(xpos), int(ypos), 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, buffer );
+		CHECK_GL_ERRORS;
+		CHECK_FRAMEBUFFER_COMPLETENESS;
+
+		// Reassemble the object ID.
+		unsigned int pickedId = buffer[0] + (buffer[1] << 8) + (buffer[2] << 16);
+		if (DEBUG_A3) {
+			cout << "Picked RGB (" << (float) buffer[0] << ", " << (float) buffer[1]
+			 << ", " << (float) buffer[2] << ")" << " ID " << pickedId << endl;
+		}
+
+		if (m_upperJointMap.count(pickedId) != 0) {
+			SceneNode* jointSelected = m_upperJointMap[pickedId];
+			for (auto node : m_jointGroupMap[jointSelected->m_nodeId]) {
+				node->isSelected = !(node->isSelected);
+			}
+			if (DEBUG_A3) {
+				cout << "Picking node: " << pickedId << ", joint " << m_upperJointMap[pickedId]->m_name
+				  	 << "selected status: " << m_upperJointMap[pickedId]->isSelected << endl;
+			}
+		}
+
+		m_controller->picking = false;
+
+		CHECK_GL_ERRORS;
+	}
 
 	return eventHandled;
 }
@@ -639,23 +723,24 @@ Controller::Controller()
 	: mode(1),
 		picking(false),
 		lastMouseLoc(0.0f, 0.0f),
-		m_trackBall(new TrackBall())
+		m_trackBall(new TrackBall()),
+		m_operations(new OperationStack())
 	{
 		reset();
 	}
 
 // Parse the mouse input into the controller
-void Controller::updateUponMouseMoveEvent(vec2 mousePos, float fDiameter, vec2 center) {
-	if (pressed(Controller::MouseButton::NONE)) {
+void Controller::updateUponMouseMoveEvent(vec2 mousePos, float fDiameter, vec2 center,
+	 	std::unordered_map<unsigned int, SceneNode*> & nodeMap) {
+	if (mouseButtonPressed.empty()) {
 		modelTranslater = vec3(0.0f);
 		m_trackBall->reset();
 	}
 
+	vec2 mouseLocChange = pixelToFC(mousePos, center) - pixelToFC(lastMouseLoc, center);
 	if ((Controller::Mode) mode == Controller::Mode::POSITION)
 	{
 		// Fill in with event handling code...
-		vec2 mouseLocChange = pixelToFC(mousePos, center) - pixelToFC(lastMouseLoc, center);
-
 		if (pressed(Controller::MouseButton::LEFT)) {
 			modelTranslater.x = mouseLocChange.x;
 			modelTranslater.y = mouseLocChange.y;
@@ -667,27 +752,45 @@ void Controller::updateUponMouseMoveEvent(vec2 mousePos, float fDiameter, vec2 c
 			m_trackBall->update(mousePos - center, lastMouseLoc - center, fDiameter);
 		}
 	}
+	else if ((Controller::Mode) mode == Controller::Mode::JOINTS)
+	{
+		std::vector<Operation> opsToAdd;
 
-	if (DEBUG_A3) {
-		print();
-	}
-}
+		if (pressed(Controller::MouseButton::MIDDLE)) {
+			for (auto kv : nodeMap) {
+				cout << "Processing kv " << kv.first << ", " << kv.second << ", " << kv.second->m_name << endl;
+				JointNode* jointNode = dynamic_cast<JointNode*>(kv.second);
+				if (jointNode != nullptr && jointNode->isSelected) {
+					vec2 rotateAngle = mouseLocChange * 100.0f;
+					if (jointNode->isHeadJoint()) {
+						rotateAngle.y = 0.0f;
+					}
+					opsToAdd.emplace_back(jointNode, rotateAngle);
+				}
+			}
+		}
+		if (pressed(Controller::MouseButton::RIGHT)) {
+			for (auto kv : nodeMap) {
+				JointNode* jointNode = dynamic_cast<JointNode*>(kv.second);
+				if (jointNode != nullptr && jointNode->isSelected && jointNode->isHeadJoint()) {
+					opsToAdd.emplace_back(jointNode, vec2(0.0f, mouseLocChange.y * 100.0f));
+				}
+			}
+		}
 
-void A3::updateUponMouseInputEvent() {
-	if (pressed(Controller::MouseButton::NONE)) {
-
-	}
-
-	if ((Controller::Mode) mode == Controller::Mode::JOINTS) {
-		// Picking mode
-		if (pressed(Controller::MouseButton::LEFT)) {
-			picking = true;
+		// Batch adding operations to give them the same groupID for the sake of Undo/Redo
+		if (!opsToAdd.empty()) {
+			m_operations->addOperations(opsToAdd);
 		}
 	}
+
+	// if (DEBUG_A3) {
+	// 	print();
+	// }
 }
 
 bool Controller::pressed(Controller::MouseButton m) {
-	return mouseButtonPressed == m;
+	return mouseButtonPressed.count(m) != 0;
 }
 
 void Controller::reset() {
@@ -705,8 +808,8 @@ vec2 Controller::pixelToFC(vec2 loc, vec2 center) {
 			loc.x / center.x - 1.0f,
 			1.0f - ( loc.y / center.y )
 	);
-	if (DEBUG_A3) {
-		cout << "Frame coordinate: " << res << endl;
-	}
+	// if (DEBUG_A3) {
+	// 	cout << "Frame coordinate: " << res << endl;
+	// }
 	return res;
 }
