@@ -270,7 +270,7 @@ void A3::initPerspectiveMatrix()
 
 //----------------------------------------------------------------------------------------
 void A3::initViewMatrix() {
-	m_view = glm::lookAt(vec3(0.0f, 0.0f, 3.0f), vec3(0.0f, 0.0f, -1.0f),
+	m_view = glm::lookAt(vec3(0.0f, 0.0f, 6.0f), vec3(0.0f, 0.0f, -1.0f),
 			vec3(0.0f, 1.0f, 0.0f));
 }
 
@@ -327,7 +327,7 @@ void A3::buildNodeMapsRecur(SceneNode* root) {
 		isSceneNode = true;
 	}
 
-	if (!isSceneNode) {
+	if (!isSceneNode && m_upperJointMap.count(root->m_nodeId) != 0) {
 		for (auto node : root->children) {
 			m_upperJointMap[node->m_nodeId] = m_upperJointMap[root->m_nodeId];
 			cout << "Upper joint of " << node->m_name << "(" << node->m_nodeId << ")"
