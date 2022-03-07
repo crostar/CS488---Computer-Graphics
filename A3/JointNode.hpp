@@ -12,6 +12,8 @@ public:
 	void set_joint_x(double min, double init, double max);
 	void set_joint_y(double min, double init, double max);
 
+	virtual void rotateAtBeginning(char axis, float angle) override;
+
 	virtual void renderRecur(
 		RenderParams params,
 		glm::mat4 stackedTrans) override;
@@ -20,6 +22,7 @@ public:
 		double min, init, max;
 	};
 
+	glm::vec2 m_rotateAngle;
 
 	JointRange m_joint_x, m_joint_y;
 };

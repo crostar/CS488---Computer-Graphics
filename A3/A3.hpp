@@ -67,6 +67,8 @@ public:
 	std::unique_ptr<TrackBall> m_trackBall;
 
 	std::unique_ptr<OperationStack> m_operations;
+	std::vector<Operation> middleMouseOperations;
+	std::vector<Operation> rightMouseOperations;
 };
 
 

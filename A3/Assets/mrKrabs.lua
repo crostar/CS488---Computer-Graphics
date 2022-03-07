@@ -13,31 +13,28 @@ function createAll()
   rEye = createEye('right');
   lEye = createEye('left');
 
-  torso:add_child(lEye)
-  torso:add_child(rEye)
-
   subroot:add_child(torso)
+  subroot:add_child(lEye)
+  subroot:add_child(rEye)
 
-  torso:translate(0.0, -0.5, 0)
-  rEye:translate(0.2, 0.8, 0)
-  lEye:translate(-0.2, 0.8, 0)
+  rEye:translate(0.2, 0.5, 0)
+  lEye:translate(-0.2, 0.5, 0)
   return subroot;
 end
 
 function createTorso()
   torso = gr.mesh('cube', 'torso')
   torso:scale(1.0, 1.0, 1.0)
-  torso:rotate('y', 45.0)
   torso:set_material(red)
   return torso
 end
 
 function createEye(name)
-  eyeJoint = gr.joint(name .. ' eye joint', {0, 10, 180}, {0, 90, 180})
+  eyeJoint = gr.joint(name .. ' eye joint', {30, 90, 150}, {30, 90, 150})
   eye = gr.mesh('sphere', name .. ' eye')
   eye:scale(0.1, 0.5, 0.1)
+  -- eye:translate(0, 0.5, 0)
   -- eye:scale(0.1, 1.0, 0.1)
-  eye:rotate('x', 45.0)
   eye:set_material(gr.material({0.4, 0.8, 0.4}, {0.8, 0.8, 0.8}, 50.0))
   eyeJoint:add_child(eye)
   return eyeJoint

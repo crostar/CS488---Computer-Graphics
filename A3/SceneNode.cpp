@@ -93,7 +93,30 @@ void SceneNode::rotate(char axis, float angle) {
 			break;
 	}
 	mat4 rot_matrix = glm::rotate(degreesToRadians(angle), rot_axis);
-	trans = rot_matrix * trans;
+	// trans = trans * rot_matrix;
+  trans = rot_matrix * trans;
+
+}
+
+//---------------------------------------------------------------------------------------
+void SceneNode::rotateAtBeginning(char axis, float angle) {
+	vec3 rot_axis;
+
+	switch (axis) {
+		case 'x':
+			rot_axis = vec3(1,0,0);
+			break;
+		case 'y':
+			rot_axis = vec3(0,1,0);
+	        break;
+		case 'z':
+			rot_axis = vec3(0,0,1);
+	        break;
+		default:
+			break;
+	}
+	mat4 rot_matrix = glm::rotate(degreesToRadians(angle), rot_axis);
+	trans = trans * rot_matrix;
 }
 
 //---------------------------------------------------------------------------------------
@@ -157,12 +180,11 @@ void OperationStack::addOperations(std::vector<Operation>& ops) {
   cout << "Adding operations of size " << ops.size()
     << ", current next/top: " << m_next << ", " << endl;
   size_t nextGroupId = m_next == 0 ? 0 : m_operations[m_next-1].groupID() + 1;
-  for (auto op : ops) {
-    op.setGroup(nextGroupId);
-    op.execute();
-  }
-  m_operations.insert(std::begin(m_operations) + m_next, std::begin(ops), std::end(ops));
-  m_next += ops.size();
+  Operation groupedOperation = Operation::merge(ops);
+  groupedOperation.setGroup(nextGroupId);
+  m_operations.insert(std::begin(m_operations) + m_next, groupedOperation);
+  m_next += 1;
+  m_size = m_next;
   cout << "Updated next/top: " << m_next << ", " << endl;
 }
 

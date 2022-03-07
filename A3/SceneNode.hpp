@@ -59,6 +59,7 @@ public:
 
 	//-- Transformations:
     void rotate(char axis, float angle);
+		virtual void rotateAtBeginning(char axis, float angle);
     void scale(const glm::vec3& amount);
     void translate(const glm::vec3& amount);
 
@@ -95,17 +96,17 @@ private:
 
 class Operation {
 public:
+	Operation(std::vector<SceneNode*>& nodes) : m_nodes(nodes), m_rotateAngle(0.0f) {}
+
 	Operation(std::vector<SceneNode*>& nodes, glm::vec2 rotateAngle)
-		: m_node(nodes), m_rotateAngle(rotateAngle) {
-			for (auto node : m_nodes) {
-				transBefore.push_back(node->trans);
-			}
-		}
+		: m_nodes(nodes), m_rotateAngle(rotateAngle) {}
 
 	void execute() {
+		transBefore.clear();
 		for (auto node : m_nodes) {
-			node->rotate('x', m_rotateAngle.x);
-			node->rotate('y', m_rotateAngle.y);
+			transBefore.push_back(node->trans);
+			node->rotateAtBeginning('x', m_rotateAngle.x);
+			node->rotateAtBeginning('y', m_rotateAngle.y);
 		}
 	}
 
@@ -127,6 +128,23 @@ public:
 		m_rotateAngle += rotateAngle;
 	}
 
+	std::vector<SceneNode*>& getNodes() {
+		return m_nodes;
+	}
+
+	glm::vec2 getRotateAngle() {
+		return m_rotateAngle;
+	}
+
+	static Operation merge(std::vector<Operation> ops) {
+		Operation groupedOperation(ops.front().m_nodes);
+		for (auto op : ops) {
+			groupedOperation.addRotation(op.getRotateAngle());
+		}
+		groupedOperation.transBefore = ops.front().transBefore;
+		return groupedOperation;
+	}
+
 private:
 	std::vector<SceneNode*> m_nodes;
 	glm::vec2 m_rotateAngle;
@@ -141,7 +159,7 @@ public:
 	void redo();
 	void addOperations(std::vector<Operation>& ops);
 	void clear();
-	// Compress the most recent 
+	// Compress the most recent
 	void compressTop();
 
 	std::vector<Operation> m_operations;

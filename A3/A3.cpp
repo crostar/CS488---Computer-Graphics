@@ -286,6 +286,7 @@ void A3::buildNodeMaps() {
 	SceneNode* root = m_rootNode.get();
 	buildNodeMapsRecur(root);
 	for (auto it = m_upperJointMap.begin(); it != m_upperJointMap.end(); it++) {
+		cout << "it " << it->first << ", " << it->second << endl;
 		if (it->second == nullptr) {
 			m_upperJointMap.erase(it);
 		}
@@ -317,18 +318,12 @@ void A3::buildNodeMaps() {
 	}
 }
 
-// Assumption: A scene node does not have any GeometryNode child
 void A3::buildNodeMapsRecur(SceneNode* root) {
 	bool isSceneNode = false;
 	if (dynamic_cast<JointNode*>(root) != nullptr) {
 		m_upperJointMap[root->m_nodeId] = root;
 		cout << "Upper joint of " << root->m_name << "(" << root->m_nodeId << ")" << ": " << root->m_name << endl;
-	} else if (dynamic_cast<GeometryNode*>(root) != nullptr) {
-		if (DEBUG_A3) {
-			cout << "Geo node has to exist in map already " <<
-				m_upperJointMap[root->m_nodeId] << endl;
-		}
-	} else {
+	} else if (dynamic_cast<GeometryNode*>(root) == nullptr) {
 		isSceneNode = true;
 	}
 
@@ -427,8 +422,12 @@ void A3::guiLogic()
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Edit")) {
-			if (ImGui::MenuItem("Undo (U)")) {}
-			if (ImGui::MenuItem("Redo (R)")) {}
+			if (ImGui::MenuItem("Undo (U)")) {
+				m_controller->m_operations->undo();
+			}
+			if (ImGui::MenuItem("Redo (R)")) {
+				m_controller->m_operations->redo();
+			}
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Options")) {
@@ -664,6 +663,20 @@ bool A3::mouseButtonInputEvent (
 		CHECK_GL_ERRORS;
 	}
 
+	if (
+		(Controller::Mode) m_controller->mode == Controller::Mode::JOINTS &&
+		actions == GLFW_RELEASE)
+	{
+		if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
+			m_controller->m_operations->addOperations(m_controller->middleMouseOperations);
+			m_controller->middleMouseOperations.clear();
+		}
+		if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+			m_controller->m_operations->addOperations(m_controller->rightMouseOperations);
+			m_controller->rightMouseOperations.clear();
+		}
+	}
+
 	return eventHandled;
 }
 
@@ -754,33 +767,29 @@ void Controller::updateUponMouseMoveEvent(vec2 mousePos, float fDiameter, vec2 c
 	}
 	else if ((Controller::Mode) mode == Controller::Mode::JOINTS)
 	{
-		std::vector<Operation> opsToAdd;
-
+		std::vector<SceneNode*> selected;
 		if (pressed(Controller::MouseButton::MIDDLE)) {
+			vec2 rotateAngle = vec2(mouseLocChange.x * 100.0f, 0.0f);
 			for (auto kv : nodeMap) {
 				cout << "Processing kv " << kv.first << ", " << kv.second << ", " << kv.second->m_name << endl;
 				JointNode* jointNode = dynamic_cast<JointNode*>(kv.second);
 				if (jointNode != nullptr && jointNode->isSelected) {
-					vec2 rotateAngle = mouseLocChange * 100.0f;
-					if (jointNode->isHeadJoint()) {
-						rotateAngle.y = 0.0f;
-					}
-					opsToAdd.emplace_back(jointNode, rotateAngle);
+					selected.push_back(kv.second);
 				}
 			}
+			middleMouseOperations.emplace_back(selected, rotateAngle);
+			middleMouseOperations.back().execute();
 		}
 		if (pressed(Controller::MouseButton::RIGHT)) {
+			vec2 rotateAngle = vec2(0.0f, mouseLocChange.y * 100.0f);
 			for (auto kv : nodeMap) {
 				JointNode* jointNode = dynamic_cast<JointNode*>(kv.second);
 				if (jointNode != nullptr && jointNode->isSelected && jointNode->isHeadJoint()) {
-					opsToAdd.emplace_back(jointNode, vec2(0.0f, mouseLocChange.y * 100.0f));
+					selected.push_back(kv.second);
 				}
 			}
-		}
-
-		// Batch adding operations to give them the same groupID for the sake of Undo/Redo
-		if (!opsToAdd.empty()) {
-			m_operations->addOperations(opsToAdd);
+			rightMouseOperations.emplace_back(selected, rotateAngle);
+			rightMouseOperations.back().execute();
 		}
 	}
 
