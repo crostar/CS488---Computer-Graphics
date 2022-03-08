@@ -55,7 +55,7 @@ A3::~A3()
 void A3::init()
 {
 	// Set the background colour.
-	glClearColor(0.85, 0.85, 0.85, 1.0);
+	glClearColor(0.8, 0.9, 1.0, 1.0);
 
 	createShaderProgram();
 
@@ -119,8 +119,10 @@ void A3::processLuaSceneFile(const std::string & filename) {
 void A3::createShaderProgram()
 {
 	m_shader.generateProgramObject();
-	m_shader.attachVertexShader( getAssetFilePath("VertexShader.vs").c_str() );
-	m_shader.attachFragmentShader( getAssetFilePath("FragmentShader.fs").c_str() );
+	// m_shader.attachVertexShader( getAssetFilePath("VertexShader.vs").c_str() );
+	// m_shader.attachFragmentShader( getAssetFilePath("FragmentShader.fs").c_str() );
+	m_shader.attachVertexShader( getAssetFilePath("Phong.vs").c_str() );
+	m_shader.attachFragmentShader( getAssetFilePath("Phong.fs").c_str() );
 	m_shader.link();
 
 	m_shader_arcCircle.generateProgramObject();
@@ -277,8 +279,9 @@ void A3::initViewMatrix() {
 //----------------------------------------------------------------------------------------
 void A3::initLightSources() {
 	// World-space position
-	m_light.position = vec3(10.0f, 10.0f, 10.0f);
-	m_light.rgbIntensity = vec3(2.0f); // light
+	// m_light.position = vec3(0.0f, 0.0f, 5.0f);
+	m_light.position = vec3(-5.0f, 0.5f, 5.0f);
+	m_light.rgbIntensity = vec3(1.0f); // light
 }
 
 //----------------------------------------------------------------------------------------
@@ -619,7 +622,7 @@ bool A3::mouseButtonInputEvent (
 		uploadCommonSceneUniforms();
 		glClearColor(1.0, 1.0, 1.0, 1.0 );
 		glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
-		glClearColor(0.85, 0.85, 0.85, 1.0);
+		glClearColor(0.8, 0.9, 1.0, 1.0);
 
 		draw();
 

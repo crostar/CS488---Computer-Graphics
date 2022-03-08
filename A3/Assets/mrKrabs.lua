@@ -1,11 +1,16 @@
 -- Mr. Krabs :
 -- https://en.wikipedia.org/wiki/Mr._Krabs
-
-red = gr.material({0.9, 0.1, 0.1}, {0.8, 0.8, 0.8}, 50.0)
+-- red (1.0, 0.63, 0.4)
+red = gr.material({1.0, 0.2, 0.1}, {0.7, 0.14, 0.07}, 50.0)
+-- red = gr.material({1.0, 0.63, 0.4}, {0.07, 0.042, 0.028}, 500.0)
 green = gr.material({0.4, 0.8, 0.4}, {0.8, 0.8, 0.8}, 50.0)
-black = gr.material({0.1, 0.1, 0.1}, {0.8, 0.8, 0.8}, 50.0)
-lightBlue = gr.material({0.6, 0.8, 0.8}, {0, 0, 0}, 0.0)
-darkBlue = gr.material({0, 0.5, 1.0}, {0, 0, 0}, 0.0)
+mouthBlack = gr.material({0.1, 0.1, 0.1}, {0, 0, 0}, 50.0)
+beltBlack = gr.material({0.1, 0.1, 0.1}, {0.8, 0.8, 0.8}, 50.0)
+lightBlue = gr.material({0.45, 0.65, 0.8}, {0.045, 0.065, 0.08}, 1.0)
+darkBlue = gr.material({0.6, 0.65, 0.85}, {0.06, 0.065, 0.085}, 100.0)
+gold = gr.material({1.0, 0.8, 0.0}, {0.8, 0.8, 0.8}, 50.0)
+-- white = gr.material({0.8, 0.85, 0.6}, {0, 0, 0}, 1.0)
+white = gr.material({0.9, 0.95, 0.9}, {0, 0, 0}, 1.0)
 
 -- Create the top level root node named 'root'.
 rootNode = gr.node('root')
@@ -22,6 +27,8 @@ function createAll()
   lLeg = createLeg('left')
   nose = createNose()
   mouth = createMouth()
+  cl, cr = createCollars()
+  belt = createBelt()
 
   subroot:add_child(t1)
   subroot:add_child(t2)
@@ -34,6 +41,9 @@ function createAll()
   subroot:add_child(rLeg)
   subroot:add_child(nose)
   subroot:add_child(mouth)
+  subroot:add_child(cl)
+  subroot:add_child(cr)
+  subroot:add_child(belt)
 
   rEye:translate(0.3, 1.15, 0)
   lEye:translate(-0.3, 1.15, 0)
@@ -49,9 +59,42 @@ function createAll()
   nose:rotate('x', 30)
   nose:translate(0, 1.25, 0.20)
 
-  mouth:rotate('x', 45)
-  mouth:translate(0, 0.95, 0.38)
+  mouth:rotate('x', 33)
+  mouth:translate(0.033, 1.06, 0.28)
   return subroot;
+end
+
+function createBelt()
+  belt = gr.mesh('sphere', 'belt')
+  belt:scale(0.9, 0.3, 0.9)
+  belt:translate(0, 0.2, 0)
+  belt:set_material(beltBlack)
+
+  button = gr.mesh('cube', 'button')
+  button:scale(0.3, 0.9, 0.2)
+  button:translate(0, 0.05, 0.9)
+  button:set_material(gold)
+
+  belt:add_child(button)
+  return belt
+end
+
+function createCollars()
+  cl = gr.mesh('cube', 'left collar')
+  cr = gr.mesh('cube', 'right collar')
+  cl:scale(0.2, 0.02, 0.2)
+  cr:scale(0.2, 0.02, 0.2)
+  cl:rotate('y', 25)
+  cr:rotate('y', -25)
+  cl:rotate('x', 25)
+  cr:rotate('x', 25)
+
+  cl:translate(-0.18, 0.7, 0.58)
+  cr:translate(0.18, 0.7, 0.58)
+
+  cl:set_material(lightBlue)
+  cr:set_material(lightBlue)
+  return cl, cr
 end
 
 function createTorso()
@@ -73,43 +116,45 @@ function createTorso()
 end
 
 function createMouth()
-  mouthJoint = gr.joint('mouth joint', {0, 0, 0}, {0, 0, 0})
+  mouthJoint = gr.joint('mouth joint', {-30, 0, 30}, {0, 0, 0})
   mouth = gr.mesh('sphere', 'mouth')
-  mouth:scale(0.4, 0.05, 0.3)
-  mouth:set_material(black)
+  mouth:scale(0.37, 0.05, 0.32)
+  mouth:set_material(mouthBlack)
   mouthJoint:add_child(mouth)
 
   return mouthJoint
 end
 
 function createNose()
+  nosecolor = red
+
   noseJoint = gr.joint('nose joint', {-30, 0, 30}, {-30, 0, 30})
   lowernose = gr.mesh('sphere', 'lower nose')
   lowernose:scale(0.02, 0.08, 0.02)
   lowernose:translate(0, 0.08, 0)
-  lowernose:set_material(black)
+  lowernose:set_material(nosecolor)
 
   lowerConnection = gr.mesh('sphere', 'middle connection')
   lowerConnection:scale(0.02, 0.02, 0.04)
   lowerConnection:rotate('x', 20)
   lowerConnection:translate(0, 0.14, 0.03)
-  lowerConnection:set_material(black)
+  lowerConnection:set_material(nosecolor)
 
   middlenose = gr.mesh('sphere', 'middle nose')
   middlenose:scale(0.02, 0.08, 0.02)
   middlenose:translate(0, 0.2, 0.06)
-  middlenose:set_material(black)
+  middlenose:set_material(nosecolor)
 
   upperConnection = gr.mesh('sphere', 'upper connection')
   upperConnection:scale(0.02, 0.02, 0.04)
   upperConnection:rotate('x', 20)
   upperConnection:translate(0, 0.26, 0.09)
-  upperConnection:set_material(black)
+  upperConnection:set_material(nosecolor)
 
   uppernose = gr.mesh('sphere', 'upper nose')
   uppernose:scale(0.02, 0.08, 0.02)
   uppernose:translate(0, 0.32, 0.12)
-  uppernose:set_material(black)
+  uppernose:set_material(nosecolor)
 
   noseJoint:add_child(lowernose)
   noseJoint:add_child(lowerConnection)
@@ -126,7 +171,7 @@ function createEye(name)
   eye = gr.mesh('sphere', name .. ' eye')
   eye:scale(0.1, length, 0.1)
   eye:translate(0, length, 0)
-  eye:set_material(gr.material({0.4, 0.8, 0.4}, {0.8, 0.8, 0.8}, 50.0))
+  eye:set_material(white)
   eyeJoint:add_child(eye)
 
   eyeLid = createEyeLid(name)
@@ -179,7 +224,7 @@ function createEyebrow(name)
   for i, eyeBrow in ipairs({eyeBrowM, eyeBrowL, eyeBrowR}) do
     eyeBrow:scale(0.02, 0.1, 0.02)
     eyeBrow:translate(0, 0.1, 0)
-    eyeBrow:set_material(black)
+    eyeBrow:set_material(mouthBlack)
     eyebrowJoint:add_child(eyeBrow)
   end
   eyeBrowL:rotate('z', 30)
@@ -191,8 +236,8 @@ function createEyeball(name)
   eyeballJoint = gr.joint(name .. ' eye ball', {-10, 0, 10}, {-10, 0, 10})
   eyeball = gr.mesh('sphere', name .. ' eye ball')
   eyeball:scale(0.065, 0.1, 0.065)
-  eyeball:translate(0, 0, 0.1)
-  eyeball:set_material(black)
+  eyeball:translate(0, 0, 0.08)
+  eyeball:set_material(beltBlack)
   eyeballJoint:add_child(eyeball)
 
   return eyeballJoint
@@ -209,28 +254,22 @@ function createArm(name)
 
   lowerArm = createLowerArm(name)
   if name == 'left' then
-    lowerArm:rotate('z', 150)
+    lowerArm:rotate('x', -150)
   else
-    lowerArm:rotate('z', -150)
+    lowerArm:rotate('x', 150)
   end
   lowerArm:translate(0, 2 * length, 0)
   upperArmJoint:add_child(lowerArm)
 
-  -- sleeve = createSleeve(name)
-  -- upperArmJoint:add_child(sleeve)
-
-  return upperArmJoint
-end
-
-function createSleeve(name)
-  sleeveJoint = gr.joint(name .. ' sleeve', {-60, 0, 60}, {-60, 0, 60})
   sleeve = gr.mesh('sphere', name .. ' sleeve')
-  sleeve:scale(0.1, 0.05, 0.1)
-  sleeve:translate(0, 0.05, 0)
+  sleeve:scale(0.08, 0.1, 0.08)
+  sleeve:translate(0, 0.04, 0)
   sleeve:set_material(lightBlue)
-  sleeveJoint:add_child(sleeve)
 
-  return sleeveJoint
+  upperArmJoint:add_child(sleeve)
+
+  upperArmJoint:rotate('y', 90)
+  return upperArmJoint
 end
 
 function createLowerArm(name)
@@ -244,20 +283,22 @@ function createLowerArm(name)
 
   hand = createHand(name)
   if name == 'left' then
-    hand:rotate('z', -90)
-  else
     hand:rotate('z', 90)
+  else
+    hand:rotate('z', -90)
   end
   hand:translate(0, 2 * lowerArmLength, 0)
   lowerArmJoint:add_child(hand)
 
+  lowerArmJoint:rotate('y', 90)
   return lowerArmJoint
 end
 
 function createHand(name)
-  handJoint = gr.joint(name .. ' hand joint', {-60, 0, 60}, {-60, 0, 60})
+  handJoint = gr.joint(name .. ' hand joint', {-10, 0, 10}, {-10, 0, 10})
   hand = gr.mesh('sphere', name .. ' hand')
   hand:scale(0.3, 0.2, 0.17)
+  hand:rotate('y', -90)
   hand:set_material(red)
   handJoint:add_child(hand)
 
@@ -274,62 +315,61 @@ function createHand(name)
     thumb:translate(0.18, 0.02, 0)
     pinky:translate(-0.18, -0.02, 0)
   end
+  thumb:rotate('y', 90)
   handJoint:add_child(thumb)
   handJoint:add_child(pinky)
 
+  handJoint:rotate('y', 90)
+  pinky:rotate('y', 90)
   return handJoint
 end
 
 function createThumb(name)
-  thumbJoint = gr.joint(name .. ' thumb joint', {-60, 0, 60}, {-60, 0, 60})
+  thumbJoint = gr.joint(name .. ' thumb joint', {-10, 0, 10}, {-10, 0, 10})
   thumb = gr.mesh('sphere', name .. ' thumb')
   thumb:scale(0.35, 0.6, 0.2)
+  thumb:rotate('y', -90)
   thumb:translate(0, 0.5, 0)
   thumb:set_material(red)
   thumbJoint:add_child(thumb)
 
+  thumbJoint:rotate('y', 90)
   return thumbJoint
 end
 
 function createPinky(name)
-  pinkyJoint = gr.joint(name .. ' pinky joint', {-60, 0, 60}, {-60, 0, 60})
+  pinkyJoint = gr.joint(name .. ' pinky joint', {-10, 0, 10}, {-10, 0, 10})
   pinky = gr.mesh('sphere', name .. ' pinky')
   pinky:scale(0.15, 0.3, 0.17)
+  pinky:rotate('y', -90)
   pinky:translate(0, 0.24, 0)
   pinky:set_material(red)
   pinkyJoint:add_child(pinky)
 
+  pinkyJoint:rotate('y', 90)
   return pinkyJoint
 end
 
 function createLeg(name)
-  upperLegJoint = gr.joint(name .. ' upper leg joint', {-30, 0, 30}, {-30, 0, 30})
+  upperLegJoint = gr.joint(name .. ' upper leg joint', {-40, 0, 40}, {-40, 0, 40})
   upperLeg = gr.mesh('sphere', name .. ' upper leg')
   upperLeg:scale(0.1, 0.05, 0.1)
   -- upperLeg:translate(0, -0.1, 0)
   upperLeg:set_material(darkBlue)
   upperLegJoint:add_child(upperLeg)
 
-  lowerLeg = createLowerLeg(name)
+  lowerLeg = gr.mesh('sphere', name .. ' lower leg')
+  lowerLeg:scale(0.05, 0.15, 0.05)
+  lowerLeg:translate(0, -0.12, 0)
+  lowerLeg:set_material(red)
+  upperLegJoint:add_child(lowerLeg)
   if name == 'left' then
     lowerLeg:rotate('z', -10)
   else
     lowerLeg:rotate('z', 10)
   end
-  -- lowerLeg:translate(0, -0.2, 0)
-  upperLegJoint:add_child(lowerLeg)
+
   return upperLegJoint
-end
-
-function createLowerLeg(name)
-  lowerLegJoint = gr.joint(name .. ' lower leg joint', {-60, 0, 60}, {-60, 0, 60})
-  lowerLeg = gr.mesh('sphere', name .. ' lower leg')
-  lowerLeg:scale(0.05, 0.15, 0.05)
-  lowerLeg:translate(0, -0.15, 0)
-  lowerLeg:set_material(red)
-  lowerLegJoint:add_child(lowerLeg)
-
-  return lowerLegJoint
 end
 
 
