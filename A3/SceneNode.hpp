@@ -20,13 +20,16 @@ class RenderParams {
 public:
 	RenderParams(
 		const ShaderProgram* shader,
+		const glm::mat4 model,
 		const glm::mat4 view,
 		const BatchInfoMap* batchInfoMap,
 		bool isPicking
-	) : m_shader(shader), m_view(view), m_batchInfoMap(batchInfoMap),
+	) : m_shader(shader), m_model(model),
+			m_view(view), m_batchInfoMap(batchInfoMap),
 			m_isPicking(isPicking) {}
 
 	const ShaderProgram* m_shader;
+	const glm::mat4 m_model;
 	const glm::mat4 m_view;
 	const BatchInfoMap* m_batchInfoMap;
 	bool m_isPicking;
@@ -155,8 +158,8 @@ private:
 class OperationStack {
 public:
 	OperationStack() { clear(); }
-	void undo();
-	void redo();
+	bool undo();
+	bool redo();
 	void addOperations(std::vector<Operation>& ops);
 	void clear();
 	// Compress the most recent

@@ -50,6 +50,11 @@ public:
 	bool pressed(MouseButton m);
 	vec2 pixelToFC(vec2 loc, vec2 center);
 
+	void resetPosition();
+	void resetOrientation();
+	void resetJoints();
+	void resetAll();
+
 	int mode;
 	bool picking;
 
@@ -57,7 +62,8 @@ public:
 	// glm::vec3 modelScaler; // scaler factor in x,y,z directions
 	// glm::vec3 modelRotateAngle; // rotation angle around x,y,z axis
 	glm::vec3 modelTranslater; // translate distance in x,y,z directions
-
+	glm::mat4 rootTranslater; // Accumulated translation on whole model
+	glm::mat4 rootRotater; // Accumulated rotation on whole model
 
 	// glm::vec3 viewRotateAngle; // rotation angle around x,y,z axis
 	// glm::vec3 viewTranslater; // translate distance in x,y,z directions
@@ -151,4 +157,6 @@ protected:
 	std::unordered_map<unsigned int, SceneNode*> m_nodeMap;
 	// Maps joint to all the geometry node it controls
 	std::unordered_map<unsigned int, std::list<SceneNode*>> m_jointGroupMap;
+
+	std::string invalidOperation;
 };

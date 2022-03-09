@@ -272,7 +272,7 @@ void A3::initPerspectiveMatrix()
 
 //----------------------------------------------------------------------------------------
 void A3::initViewMatrix() {
-	m_view = glm::lookAt(vec3(0.0f, 0.0f, 6.0f), vec3(0.0f, 0.0f, -1.0f),
+	m_view = glm::lookAt(vec3(0.0f, 1.0f, 6.0f), vec3(0.0f, 1.0f, -1.0f),
 			vec3(0.0f, 1.0f, 0.0f));
 }
 
@@ -415,10 +415,18 @@ void A3::guiLogic()
 
 	if (ImGui::BeginMainMenuBar()) {
 		if (ImGui::BeginMenu("Application")) {
-			if (ImGui::MenuItem("Reset Position (I)")) {}
-			if (ImGui::MenuItem("Reset Orientation (O)")) {}
-			if (ImGui::MenuItem("Reset Joints (S)")) {}
-			if (ImGui::MenuItem("Reset All (A)")) {}
+			if (ImGui::MenuItem("Reset Position (I)")) {
+				m_controller->resetPosition();
+			}
+			if (ImGui::MenuItem("Reset Orientation (O)")) {
+				m_controller->resetOrientation();
+			}
+			if (ImGui::MenuItem("Reset Joints (S)")) {
+				m_controller->resetJoints();
+			}
+			if (ImGui::MenuItem("Reset All (A)")) {
+				m_controller->resetAll();
+			}
 			if( ImGui::MenuItem( "Quit Application" ) ) {
 				glfwSetWindowShouldClose(m_window, GL_TRUE);
 			}
@@ -426,10 +434,14 @@ void A3::guiLogic()
 		}
 		if (ImGui::BeginMenu("Edit")) {
 			if (ImGui::MenuItem("Undo (U)")) {
-				m_controller->m_operations->undo();
+				if (!m_controller->m_operations->undo()) {
+					invalidOperation = "undo";
+				}
 			}
 			if (ImGui::MenuItem("Redo (R)")) {
-				m_controller->m_operations->redo();
+				if (m_controller->m_operations->redo()) {
+					invalidOperation = "redo";
+				}
 			}
 			ImGui::EndMenu();
 		}
@@ -449,15 +461,16 @@ void A3::guiLogic()
 
 	ImGui::Begin("Properties", &showDebugWindow, ImVec2(100,100), opacity,
 			windowFlags);
-
 	ImGui::RadioButton( "Position/Orientation (P)", &(m_controller->mode), 1 );
 	ImGui::RadioButton( "Joints (J)", &(m_controller->mode), 2 );
-
-
-
 	ImGui::Text( "Framerate: %.1f FPS", ImGui::GetIO().Framerate );
-
 	ImGui::End();
+
+	if (!invalidOperation.empty()) {
+		ImGui::Begin("Error");
+		ImGui::Text("Invalid operation, cannot %s", invalidOperation.c_str());
+		ImGui::End();
+	}
 }
 
 //----------------------------------------------------------------------------------------
@@ -483,6 +496,7 @@ void A3::renderSceneGraph(SceneNode & root) {
 	// cout << "Rendering Scene Graph, picking: " << m_controller->picking << endl;
 	RenderParams params(
 		m_controller->picking ? &m_shader_picking : &m_shader,
+		m_controller->rootTranslater * m_controller->rootRotater,
 		m_view, &m_batchInfoMap, m_controller->picking);
 
 	// if (m_controller->picking) {
@@ -523,8 +537,12 @@ void A3::renderArcCircle() {
  * Update model, called after mouse events
  */
 void A3::updateModel() {
-	m_rootNode->set_transform(m_rootNode->get_transform() * m_controller->m_trackBall->m_rotMat);
-	m_rootNode->translate(SCALE_FACTOR * m_controller->modelTranslater);
+	m_controller->rootTranslater =
+		glm::translate(glm::mat4(), SCALE_FACTOR * m_controller->modelTranslater) *
+		m_controller->rootTranslater;
+	m_controller->rootRotater = m_controller->m_trackBall->m_rotMat * m_controller->rootRotater;
+	// m_rootNode->set_transform(m_rootNode->get_transform() * m_controller->m_trackBall->m_rotMat);
+	// m_rootNode->translate(SCALE_FACTOR * m_controller->modelTranslater);
 }
 
 //----------------------------------------------------------------------------------------
@@ -670,11 +688,11 @@ bool A3::mouseButtonInputEvent (
 		(Controller::Mode) m_controller->mode == Controller::Mode::JOINTS &&
 		actions == GLFW_RELEASE)
 	{
-		if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
+		if (button == GLFW_MOUSE_BUTTON_MIDDLE && !m_controller->middleMouseOperations.empty()) {
 			m_controller->m_operations->addOperations(m_controller->middleMouseOperations);
 			m_controller->middleMouseOperations.clear();
 		}
-		if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+		if (button == GLFW_MOUSE_BUTTON_RIGHT && !m_controller->middleMouseOperations.empty()) {
 			m_controller->m_operations->addOperations(m_controller->rightMouseOperations);
 			m_controller->rightMouseOperations.clear();
 		}
@@ -727,6 +745,28 @@ bool A3::keyInputEvent (
 			show_gui = !show_gui;
 			eventHandled = true;
 		}
+		if (key == GLFW_KEY_I) {
+			m_controller->resetPosition();
+		}
+		if (key == GLFW_KEY_O) {
+			m_controller->resetOrientation();
+		}
+		if (key == GLFW_KEY_S) {
+			m_controller->resetJoints();
+		}
+		if (key == GLFW_KEY_A) {
+			m_controller->resetAll();
+		}
+		if (key == GLFW_KEY_U) {
+			if (m_controller->m_operations->undo()) {
+				invalidOperation = "undo";
+			}
+		}
+		if (key == GLFW_KEY_R) {
+			if (m_controller->m_operations->redo()) {
+				invalidOperation = "redo";
+			}
+		}
 	}
 	// Fill in with event handling code...
 
@@ -748,8 +788,10 @@ Controller::Controller()
 // Parse the mouse input into the controller
 void Controller::updateUponMouseMoveEvent(vec2 mousePos, float fDiameter, vec2 center,
 	 	std::unordered_map<unsigned int, SceneNode*> & nodeMap) {
-	if (mouseButtonPressed.empty()) {
+	if (!pressed(Controller::MouseButton::LEFT)) {
 		modelTranslater = vec3(0.0f);
+	}
+	if (!pressed(Controller::MouseButton::RIGHT)) {
 		m_trackBall->reset();
 	}
 
@@ -813,7 +855,26 @@ void Controller::print() {
 	cout << "modelTranslater: " << modelTranslater << endl;
 }
 
-//----------------------------------------------------------------------------------------
+
+void Controller::resetPosition() {
+	rootTranslater = glm::mat4();
+}
+
+void Controller::resetOrientation() {
+	rootRotater = glm::mat4();
+}
+
+void Controller::resetJoints() {
+	m_operations->clear();
+}
+
+void Controller::resetAll() {
+	resetPosition();
+	resetOrientation();
+	resetJoints();
+}
+
+
 // Helpers
 vec2 Controller::pixelToFC(vec2 loc, vec2 center) {
 	vec2 res (

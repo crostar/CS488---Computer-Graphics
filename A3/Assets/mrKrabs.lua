@@ -245,7 +245,7 @@ end
 
 function createArm(name)
   length = 0.5
-  upperArmJoint = gr.joint(name .. ' upper arm joint', {-30, 0, 30}, {-30, 0, 30})
+  upperArmJoint = gr.joint(name .. ' upper arm joint', {-10, 0, 10}, {-10, 0, 10})
   upperArm = gr.mesh('sphere', name .. ' upper arm')
   upperArm:scale(0.04, length, 0.04)
   upperArm:translate(0, length, 0)
@@ -274,7 +274,7 @@ end
 
 function createLowerArm(name)
   lowerArmLength = 0.4
-  lowerArmJoint = gr.joint(name .. ' lower arm joint', {-60, 0, 60}, {-60, 0, 60})
+  lowerArmJoint = gr.joint(name .. ' lower arm joint', {-10, 0, 10}, {-10, 0, 10})
   lowerArm = gr.mesh('sphere', name .. ' lower arm')
   lowerArm:scale(0.04, lowerArmLength, 0.04)
   lowerArm:translate(0, lowerArmLength, 0)
