@@ -12,6 +12,8 @@
 #include <string>
 #include <iostream>
 
+#include <glm/ext.hpp>
+
 class ShaderProgram;
 class Operation;
 class OperationStack;
@@ -73,7 +75,7 @@ public:
 		glm::mat4 stackedTrans);
 
 	bool isHeadJoint() {
-		return m_name == "head-joint";
+		return m_name.find("eye joint") != std::string::npos;
 	}
 
 	friend std::ostream & operator << (std::ostream & os, const SceneNode & node);
@@ -94,78 +96,4 @@ public:
 private:
 	// The number of SceneNode instances.
 	static unsigned int nodeInstanceCount;
-};
-
-
-class Operation {
-public:
-	Operation(std::vector<SceneNode*>& nodes) : m_nodes(nodes), m_rotateAngle(0.0f) {}
-
-	Operation(std::vector<SceneNode*>& nodes, glm::vec2 rotateAngle)
-		: m_nodes(nodes), m_rotateAngle(rotateAngle) {}
-
-	void execute() {
-		transBefore.clear();
-		for (auto node : m_nodes) {
-			transBefore.push_back(node->trans);
-			node->rotateAtBeginning('x', m_rotateAngle.x);
-			node->rotateAtBeginning('y', m_rotateAngle.y);
-		}
-	}
-
-	void undo() {
-		for (int i=0; i<m_nodes.size(); i++) {
-			m_nodes[i]->trans = transBefore[i];
-		}
-	}
-
-	void setGroup(size_t group) {
-		m_group = group;
-	}
-
-	size_t groupID() {
-		return m_group;
-	}
-
-	void addRotation(glm::vec2 rotateAngle) {
-		m_rotateAngle += rotateAngle;
-	}
-
-	std::vector<SceneNode*>& getNodes() {
-		return m_nodes;
-	}
-
-	glm::vec2 getRotateAngle() {
-		return m_rotateAngle;
-	}
-
-	static Operation merge(std::vector<Operation> ops) {
-		Operation groupedOperation(ops.front().m_nodes);
-		for (auto op : ops) {
-			groupedOperation.addRotation(op.getRotateAngle());
-		}
-		groupedOperation.transBefore = ops.front().transBefore;
-		return groupedOperation;
-	}
-
-private:
-	std::vector<SceneNode*> m_nodes;
-	glm::vec2 m_rotateAngle;
-	std::vector<glm::mat4> transBefore;
-	size_t m_group;
-};
-
-class OperationStack {
-public:
-	OperationStack() { clear(); }
-	bool undo();
-	bool redo();
-	void addOperations(std::vector<Operation>& ops);
-	void clear();
-	// Compress the most recent
-	void compressTop();
-
-	std::vector<Operation> m_operations;
-	size_t m_next;
-	size_t m_size;
 };

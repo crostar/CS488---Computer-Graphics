@@ -49,7 +49,7 @@ void updateShaderUniforms(
 		location = params.m_shader->getUniformLocation("material.kd");
 		vec3 kd;
 		if (node.isSelected) {
-			kd = glm::vec3( 0.7, 0.7, 0.7 );
+			kd = glm::vec3( 0.7, 0.1, 0.7 );
 		} else {
 			kd = node.material.kd;
 		}

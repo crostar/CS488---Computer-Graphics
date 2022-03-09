@@ -16,7 +16,7 @@
 #include <glm/glm.hpp>
 
 
-#define DEBUG_A3 1
+#define DEBUG_A3 0
 
 struct LightSource {
 	glm::vec3 position;
@@ -75,6 +75,11 @@ public:
 	std::unique_ptr<OperationStack> m_operations;
 	std::vector<Operation> middleMouseOperations;
 	std::vector<Operation> rightMouseOperations;
+
+	bool m_drawArcCircle;
+	bool m_enableZBuffer;
+	bool m_enableBackCull;
+	bool m_enableFrontCull;
 };
 
 
@@ -107,7 +112,6 @@ protected:
 	void initViewMatrix();
 	void initLightSources();
 	void buildNodeMaps();
-	void initFbo();
 
 	void initPerspectiveMatrix();
 	void uploadCommonSceneUniforms();
@@ -138,7 +142,6 @@ protected:
 	ShaderProgram m_shader_arcCircle;
 
 	ShaderProgram m_shader_picking;
-	GLuint m_picking_fbo;
 
 	// BatchInfoMap is an associative container that maps a unique MeshId to a BatchInfo
 	// object. Each BatchInfo object contains an index offset and the number of indices

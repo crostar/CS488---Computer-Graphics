@@ -55,15 +55,14 @@ A3::~A3()
 void A3::init()
 {
 	// Set the background colour.
-	glClearColor(0.8, 0.9, 1.0, 1.0);
+	glClearColor(0.5, 0.78, 0.79, 1.0);
+
 
 	createShaderProgram();
 
 	glGenVertexArrays(1, &m_vao_arcCircle);
 	glGenVertexArrays(1, &m_vao_meshData);
 	enableVertexShaderInputSlots();
-
-	initFbo();
 
 	processLuaSceneFile(m_luaSceneFile);
 
@@ -134,12 +133,6 @@ void A3::createShaderProgram()
 	m_shader_picking.attachVertexShader( getAssetFilePath("pick_VertexShader.vs").c_str() );
 	m_shader_picking.attachFragmentShader( getAssetFilePath("pick_FragmentShader.fs").c_str() );
 	m_shader_picking.link();
-}
-
-//----------------------------------------------------------------------------------------
-void A3::initFbo()
-{
-	glGenFramebuffers(1, &m_picking_fbo);
 }
 
 //----------------------------------------------------------------------------------------
@@ -289,7 +282,6 @@ void A3::buildNodeMaps() {
 	SceneNode* root = m_rootNode.get();
 	buildNodeMapsRecur(root);
 	for (auto it = m_upperJointMap.begin(); it != m_upperJointMap.end(); it++) {
-		cout << "it " << it->first << ", " << it->second << endl;
 		if (it->second == nullptr) {
 			m_upperJointMap.erase(it);
 		}
@@ -325,7 +317,6 @@ void A3::buildNodeMapsRecur(SceneNode* root) {
 	bool isSceneNode = false;
 	if (dynamic_cast<JointNode*>(root) != nullptr) {
 		m_upperJointMap[root->m_nodeId] = root;
-		cout << "Upper joint of " << root->m_name << "(" << root->m_nodeId << ")" << ": " << root->m_name << endl;
 	} else if (dynamic_cast<GeometryNode*>(root) == nullptr) {
 		isSceneNode = true;
 	}
@@ -333,8 +324,6 @@ void A3::buildNodeMapsRecur(SceneNode* root) {
 	if (!isSceneNode && m_upperJointMap.count(root->m_nodeId) != 0) {
 		for (auto node : root->children) {
 			m_upperJointMap[node->m_nodeId] = m_upperJointMap[root->m_nodeId];
-			cout << "Upper joint of " << node->m_name << "(" << node->m_nodeId << ")"
-				<< ": " << m_upperJointMap[root->m_nodeId]->m_name << endl;
 		}
 	}
 
@@ -347,7 +336,6 @@ void A3::buildNodeMapsRecur(SceneNode* root) {
 
 //----------------------------------------------------------------------------------------
 void A3::uploadCommonSceneUniforms() {
-	// if (m_controller->picking) {
 		m_shader_picking.enable();
 		{
 			//-- Set Perpsective matrix uniform for the scene:
@@ -356,7 +344,6 @@ void A3::uploadCommonSceneUniforms() {
 			CHECK_GL_ERRORS;
 		}
 		m_shader_picking.disable();
-	// } else {
 		m_shader.enable();
 		{
 			//-- Set Perpsective matrix uniform for the scene:
@@ -383,7 +370,6 @@ void A3::uploadCommonSceneUniforms() {
 			}
 		}
 		m_shader.disable();
-	// }
 }
 
 //----------------------------------------------------------------------------------------
@@ -439,17 +425,17 @@ void A3::guiLogic()
 				}
 			}
 			if (ImGui::MenuItem("Redo (R)")) {
-				if (m_controller->m_operations->redo()) {
+				if (!m_controller->m_operations->redo()) {
 					invalidOperation = "redo";
 				}
 			}
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Options")) {
-			if (ImGui::MenuItem("Circle (C)")) {}
-			if (ImGui::MenuItem("Z-buffer (Z)")) {}
-			if (ImGui::MenuItem("Backface culling (B)")) {}
-			if (ImGui::MenuItem("Frontface culling (F)")) {}
+			ImGui::Checkbox("Circle (C)", &(m_controller->m_drawArcCircle));
+			ImGui::Checkbox("Z-buffer (Z)", &(m_controller->m_enableZBuffer));
+			ImGui::Checkbox("Backface culling (B)", &(m_controller->m_enableBackCull));
+			ImGui::Checkbox("Frontface culling (F)", &(m_controller->m_enableFrontCull));
 			ImGui::EndMenu();
 		}
 		ImGui::EndMainMenuBar();
@@ -466,9 +452,13 @@ void A3::guiLogic()
 	ImGui::Text( "Framerate: %.1f FPS", ImGui::GetIO().Framerate );
 	ImGui::End();
 
+	bool showErrorWindow(!invalidOperation.empty());
 	if (!invalidOperation.empty()) {
-		ImGui::Begin("Error");
+		ImGui::Begin("Error", &showErrorWindow, windowFlags);
 		ImGui::Text("Invalid operation, cannot %s", invalidOperation.c_str());
+		if( ImGui::Button( "OK" ) ) {
+			invalidOperation.clear();
+		}
 		ImGui::End();
 	}
 }
@@ -479,12 +469,29 @@ void A3::guiLogic()
  */
 void A3::draw() {
 
-	glDisable( GL_DEPTH_TEST );
-	renderArcCircle();
+	if (m_controller->m_drawArcCircle) {
+		glDisable( GL_DEPTH_TEST );
+		renderArcCircle();
+	}
 
-	glEnable( GL_DEPTH_TEST );
+	if (m_controller->m_enableZBuffer) {
+		glEnable( GL_DEPTH_TEST );
+	} else {
+		glDisable( GL_DEPTH_TEST );
+	}
+	if (m_controller->m_enableBackCull && m_controller->m_enableFrontCull) {
+		glEnable( GL_CULL_FACE );
+		glCullFace( GL_FRONT_AND_BACK );
+	} else if (m_controller->m_enableFrontCull) {
+		glEnable( GL_CULL_FACE );
+		glCullFace( GL_FRONT );
+	} else if (m_controller->m_enableBackCull) {
+		glEnable( GL_CULL_FACE );
+		glCullFace( GL_BACK );
+	} else {
+		glDisable( GL_CULL_FACE );
+	}
 	renderSceneGraph(*m_rootNode);
-
 }
 
 //----------------------------------------------------------------------------------------
@@ -499,11 +506,8 @@ void A3::renderSceneGraph(SceneNode & root) {
 		m_controller->rootTranslater * m_controller->rootRotater,
 		m_view, &m_batchInfoMap, m_controller->picking);
 
-	// if (m_controller->picking) {
-	// 	glBindFramebuffer(GL_FRAMEBUFFER, m_picking_fbo);
-	// } else {
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	// }
+
 	root.render(params);
 
 	glBindVertexArray(0);
@@ -551,7 +555,6 @@ void A3::updateModel() {
  */
 void A3::cleanup()
 {
-	glDeleteFramebuffers(1, &m_picking_fbo);
 }
 
 //----------------------------------------------------------------------------------------
@@ -640,7 +643,7 @@ bool A3::mouseButtonInputEvent (
 		uploadCommonSceneUniforms();
 		glClearColor(1.0, 1.0, 1.0, 1.0 );
 		glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
-		glClearColor(0.8, 0.9, 1.0, 1.0);
+		glClearColor(0.5, 0.78, 0.79, 1.0);
 
 		draw();
 
@@ -758,14 +761,32 @@ bool A3::keyInputEvent (
 			m_controller->resetAll();
 		}
 		if (key == GLFW_KEY_U) {
-			if (m_controller->m_operations->undo()) {
+			if (!m_controller->m_operations->undo()) {
 				invalidOperation = "undo";
 			}
 		}
 		if (key == GLFW_KEY_R) {
-			if (m_controller->m_operations->redo()) {
+			if (!m_controller->m_operations->redo()) {
 				invalidOperation = "redo";
 			}
+		}
+		if (key == GLFW_KEY_C) {
+			m_controller->m_drawArcCircle = !(m_controller->m_drawArcCircle);
+		}
+		if (key == GLFW_KEY_Z) {
+			m_controller->m_enableZBuffer = !(m_controller->m_enableZBuffer);
+		}
+		if (key == GLFW_KEY_B) {
+			m_controller->m_enableBackCull = !(m_controller->m_enableBackCull);
+		}
+		if (key == GLFW_KEY_F) {
+			m_controller->m_enableFrontCull = !(m_controller->m_enableFrontCull);
+		}
+		if (key == GLFW_KEY_P) {
+			m_controller->mode = (int) Controller::Mode::POSITION;
+		}
+		if (key == GLFW_KEY_J) {
+			m_controller->mode = (int) Controller::Mode::JOINTS;
 		}
 	}
 	// Fill in with event handling code...
@@ -780,7 +801,11 @@ Controller::Controller()
 		picking(false),
 		lastMouseLoc(0.0f, 0.0f),
 		m_trackBall(new TrackBall()),
-		m_operations(new OperationStack())
+		m_operations(new OperationStack()),
+		m_drawArcCircle(false),
+		m_enableZBuffer(true),
+		m_enableBackCull(false),
+		m_enableFrontCull(false)
 	{
 		reset();
 	}
@@ -812,25 +837,25 @@ void Controller::updateUponMouseMoveEvent(vec2 mousePos, float fDiameter, vec2 c
 	}
 	else if ((Controller::Mode) mode == Controller::Mode::JOINTS)
 	{
-		std::vector<SceneNode*> selected;
+		std::vector<JointNode*> selected;
 		if (pressed(Controller::MouseButton::MIDDLE)) {
-			vec2 rotateAngle = vec2(mouseLocChange.x * 100.0f, 0.0f);
+			vec2 rotateAngle = vec2(mouseLocChange.y * 100.0f, 0.0f);
+
 			for (auto kv : nodeMap) {
-				cout << "Processing kv " << kv.first << ", " << kv.second << ", " << kv.second->m_name << endl;
 				JointNode* jointNode = dynamic_cast<JointNode*>(kv.second);
 				if (jointNode != nullptr && jointNode->isSelected) {
-					selected.push_back(kv.second);
+					selected.push_back(jointNode);
 				}
 			}
 			middleMouseOperations.emplace_back(selected, rotateAngle);
 			middleMouseOperations.back().execute();
 		}
 		if (pressed(Controller::MouseButton::RIGHT)) {
-			vec2 rotateAngle = vec2(0.0f, mouseLocChange.y * 100.0f);
+			vec2 rotateAngle = vec2(0.0f, mouseLocChange.x * 100.0f);
 			for (auto kv : nodeMap) {
 				JointNode* jointNode = dynamic_cast<JointNode*>(kv.second);
 				if (jointNode != nullptr && jointNode->isSelected && jointNode->isHeadJoint()) {
-					selected.push_back(kv.second);
+					selected.push_back(jointNode);
 				}
 			}
 			rightMouseOperations.emplace_back(selected, rotateAngle);
