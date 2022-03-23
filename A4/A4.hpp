@@ -8,6 +8,8 @@
 #include "Light.hpp"
 #include "Image.hpp"
 
+
+
 void A4_Render(
 		// What to render
 		SceneNode * root,
@@ -24,4 +26,18 @@ void A4_Render(
 		// Lighting parameters
 		const glm::vec3 & ambient,
 		const std::list<Light *> & lights
+);
+
+void getDirection(
+	glm::vec3 eye, glm::vec3 view, glm::vec3 up,
+	double fovy, size_t w, size_t h, float x, float y,
+	glm::vec3& direction);
+
+bool getRGB(
+	SceneNode* root, glm::vec3 rayOrigin, glm::vec3 rayDirection,
+	// Lighting parameters
+	const glm::vec3 & ambient,
+	const std::list<Light *> & lights,
+	glm::vec3& colorAcc,
+	bool debug = false
 );

@@ -1,0 +1,24 @@
+# CS488 A4
+> Mingze Xu, #20806115
+## Compilation
+The compiation steps is as follows:
+```{bash}
+$ cd A4
+$ premake4 gmake
+$ make
+$ cd Assets
+$ ../A4 sample.lua
+```
+The dev program has been run on the local virtual machine
+
+## Bounding volume Rendering
+Bounding volume rendering is controlled by compile flag `-D RENDER_BOUNDING_VOLUMES` (see premake4.lua)
+
+## Additional feature
+- Stochastic sample antialiasing: jitter the sample positions in 5*5 subpixel grid.
+Controlled by compile argument `-D ENABLE_ANTI_ALIASING` (see premake4.lua)
+
+## Models
+- Background image is retrieved from
+[here](https://www.deviantart.com/ethan2509/art/Spongebob-Famous-Ocean-sky-background-856723965).
+lodepng library is utilized to read in the background image and apply to every scene.

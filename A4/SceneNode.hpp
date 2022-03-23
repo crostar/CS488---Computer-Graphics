@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Material.hpp"
+#include "HitParams.hpp"
 
 #include <glm/glm.hpp>
 
@@ -10,11 +11,16 @@
 #include <string>
 #include <iostream>
 
+class GeometryNode;
+
 enum class NodeType {
 	SceneNode,
 	GeometryNode,
 	JointNode
 };
+
+#include <glm/ext.hpp>
+
 
 class SceneNode {
 public:
@@ -23,17 +29,19 @@ public:
 	SceneNode(const SceneNode & other);
 
     virtual ~SceneNode();
-    
+
 	int totalSceneNodes() const;
-    
+
     const glm::mat4& get_transform() const;
     const glm::mat4& get_inverse() const;
-    
+
     void set_transform(const glm::mat4& m);
-    
+
     void add_child(SceneNode* child);
-    
+
     void remove_child(SceneNode* child);
+
+		virtual bool hit(HitParams& params);
 
 	//-- Transformations:
     void rotate(char axis, float angle);
@@ -46,7 +54,7 @@ public:
     // Transformations
     glm::mat4 trans;
     glm::mat4 invtrans;
-    
+
     std::list<SceneNode*> children;
 
 	NodeType m_nodeType;

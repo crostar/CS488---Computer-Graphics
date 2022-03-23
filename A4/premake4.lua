@@ -7,7 +7,7 @@ includeDirList = {
     "../shared/imgui"
 }
 
-libDirectories = { 
+libDirectories = {
     "../lib"
 }
 
@@ -37,7 +37,11 @@ if os.get() == "macosx" then
     linkOptionList = { "-framework IOKit", "-framework Cocoa", "-framework CoreVideo", "-framework OpenGL" }
 end
 
-buildOptions = {"-std=c++14"}
+buildOptions = {"-std=c++14", "-O2"}
+-- To enable anti antialiasing / bounding volume render
+-- buildOptions = {"-std=c++14", "-D RENDER_BOUNDING_VOLUMES", "-D ENABLE_ANTI_ALIASING", "-O2"}
+-- buildOptions = {"-std=c++14", "-D RENDER_BOUNDING_VOLUMES", "-O2"}
+-- buildOptions = {"-std=c++14", "-D ENABLE_ANTI_ALIASING" , "-O2"}
 
 solution "CS488-Projects"
     configurations { "Debug", "Release" }

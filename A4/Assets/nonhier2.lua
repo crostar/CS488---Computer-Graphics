@@ -1,6 +1,6 @@
 -- A simple scene with some miscellaneous geometry.
 -- This file is very similar to nonhier.lua, but interposes
--- an additional transformation on the root node.  
+-- an additional transformation on the root node.
 -- The translation moves the scene, and the position of the camera
 -- and lights have been modified accordingly.
 

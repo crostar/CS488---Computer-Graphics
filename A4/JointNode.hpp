@@ -12,6 +12,8 @@ public:
 	void set_joint_x(double min, double init, double max);
 	void set_joint_y(double min, double init, double max);
 
+	virtual bool hit(HitParams& params);
+
 	struct JointRange {
 		double min, init, max;
 	};

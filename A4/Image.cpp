@@ -51,7 +51,7 @@ Image::~Image()
 Image & Image::operator=(const Image& other)
 {
   delete [] m_data;
-  
+
   m_width = other.m_width;
   m_height = other.m_height;
   m_data = (other.m_data ? new double[m_width * m_height * m_colorComponents] : 0);
@@ -62,7 +62,7 @@ Image & Image::operator=(const Image& other)
                 m_width * m_height * m_colorComponents * sizeof(double)
     );
   }
-  
+
   return *this;
 }
 
@@ -123,6 +123,56 @@ bool Image::savePng(const std::string & filename) const
 	}
 
 	return true;
+}
+
+//---------------------------------------------------------------------------------------
+bool Image::readPNG(const std::string & filename)
+{
+	std::vector<unsigned char> image;
+
+  unsigned error = lodepng::decode(image, m_width, m_height, filename, LCT_RGB);
+
+  if(error) std::cout << "decoder error " << error << ": " << lodepng_error_text(error) << std::endl;
+
+  delete [] m_data;
+  size_t numElements = m_width * m_height * m_colorComponents;
+  m_data = new double[numElements];
+  memset(m_data, 0, numElements*sizeof(double));
+
+  double color;
+	for (uint y(0); y < m_height; y++) {
+		for (uint x(0); x < m_width; x++) {
+			for (uint i(0); i < m_colorComponents; ++i) {
+        float color = image[m_colorComponents * (m_width * y + x) + i] / 255.0f;
+        color = clamp(color, 0.0, 1.0);
+        m_data[m_colorComponents * (m_width * y + x) + i] = color;
+			}
+		}
+	}
+
+	return true;
+}
+
+//---------------------------------------------------------------------------------------
+bool Image::compress(size_t newW, size_t newH) {
+  size_t numElements = newW * newH * m_colorComponents;
+	double * newData = new double[numElements];
+	memset(newData, 0, numElements*sizeof(double));
+  for (uint y(0); y < newH; y++) {
+    for (uint x(0); x < newW; x++) {
+      for (uint i(0); i < m_colorComponents; ++i) {
+        uint mapX = uint (float(x) / newW * m_width);
+        uint mapY = uint (float(y) / newH * m_height);
+        uint mapPos = m_colorComponents * (m_width * mapY + mapX) + i;
+        newData[m_colorComponents * (newW * y + x) + i] = m_data[mapPos];
+      }
+    }
+  }
+  m_height = newH;
+  m_width = newW;
+  delete [] m_data;
+  m_data = newData;
+  return true;
 }
 
 //---------------------------------------------------------------------------------------

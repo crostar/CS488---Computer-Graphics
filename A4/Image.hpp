@@ -46,6 +46,10 @@ public:
 	// Warning: If 'filename' already exists, it will be overwritten.
 	bool savePng(const std::string & filename) const;
 
+	bool readPNG(const std::string & filename);
+
+	bool compress(size_t newW, size_t newH);
+
 	const double * data() const;
 	double * data();
 

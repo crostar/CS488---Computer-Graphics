@@ -1,6 +1,7 @@
 // Termm--Fall 2020
 
 #include "SceneNode.hpp"
+#include "GeometryNode.hpp"
 
 #include "cs488-framework/MathUtils.hpp"
 
@@ -17,7 +18,6 @@ using namespace glm;
 
 // Static class variable
 unsigned int SceneNode::nodeInstanceCount = 0;
-
 
 //---------------------------------------------------------------------------------------
 SceneNode::SceneNode(const std::string& name)
@@ -135,4 +135,25 @@ std::ostream & operator << (std::ostream & os, const SceneNode & node) {
 
 	os << "]\n";
 	return os;
+}
+
+//---------------------------------------------------------------------------------------
+bool SceneNode::hit(HitParams& params) {
+  params.rayOrigin = vec3(get_inverse() * vec4(params.rayOrigin, 1));
+	params.rayDirection = vec3(get_inverse() * vec4(params.rayDirection, 0.0f));
+
+	bool hit = false;
+
+	for (auto child : children) {
+		hit |= child->hit(params);
+	}
+
+  if (hit) {
+  	params.hitPoint = vec3(get_transform() * vec4(params.hitPoint, 1));
+    params.normal = normalize(vec3(transpose(get_inverse()) * vec4(params.normal, 0.0f)));
+  }
+	params.rayOrigin = vec3(get_transform() * vec4(params.rayOrigin, 1));
+	params.rayDirection = vec3(get_transform() * vec4(params.rayDirection, 0.0f));
+
+	return hit;
 }
