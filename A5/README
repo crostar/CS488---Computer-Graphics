@@ -1,0 +1,49 @@
+# CS488 A3
+> Mingze Xu, #20806115
+## Compilation
+The compiation steps is as follows:
+```{bash}
+$ cd A3
+$ premake4 gmake
+$ make
+$ ./A3 Asset/puppet.lua
+```
+The dev program has been run on the local virtual machine
+
+## Manual
+The puppet created in this assignment is [Mr. Krabs](https://spongebob.fandom.com/wiki/Eugene_H._Krabs)
+(A fictional character in the American animated television series SpongeBob SquarePants.)
+
+#### Important notes for grading
+- Mr. Krabs does not have a rotatable "head" in the common sense. Thus, dragging the right
+mouse in the JOINTS mode controls the rotation of his **eyes** around y-axis.
+  - Click on the white part of the eyes to select the eye joint
+  - Drag middle/right mouse to see the rotation
+
+#### Data structure changes
+- SceneNode
+  - render is implemented inside SceneNode class family
+  - JointNode
+    - Accumulated rotation angles are stored, which is referred to calculate
+    the rotation matrix upon rendering.
+
+- OperationStack
+  - Command pattern is implemented in JointNode.hpp, where new data structure
+  Operation and OperationStack are defined
+
+#### Hierarchical model
+List of parts in the model:
+- Torso
+- Eyes - Eye lids - Eyebrow
+- Nose
+- Mouth
+- Arms - Hands - Pliers
+- Legs
+- Belt and button
+
+The hierarchical model is illustrated in the following chart. Note only right side
+is described. The mouth, nose and legs are omited in the chart since the structure is trivial and
+similar to the other parts.
+![Structure](architecture.png)
+- In the chart, yellow nodes are SceneNode, blue nodes are Joints and purple nodes
+are GeometryNode.
