@@ -22,6 +22,7 @@ static bool show_gui = true;
 
 const size_t CIRCLE_PTS = 48;
 const float SCALE_FACTOR = 2.0f;
+const float KEY_STEP = 0.01;
 
 const size_t DIM = 16;
 
@@ -73,6 +74,7 @@ void A3::init()
 			getAssetFilePath("suzanne.obj")
 	});
 
+	m_skybox.init();
 
 	// Acquire the BatchInfoMap from the MeshConsolidator.
 	meshConsolidator->getBatchInfoMap(m_batchInfoMap);
@@ -93,6 +95,7 @@ void A3::init()
 	// all vertex data resources.  This is fine since we already copied this data to
 	// VBOs on the GPU.  We have no use for storing vertex data on the CPU side beyond
 	// this point.
+
 }
 
 //----------------------------------------------------------------------------------------
@@ -197,12 +200,6 @@ void A3::mapVboDataToVertexShaderInputLocations()
 	glBindVertexArray(0);
 
 	CHECK_GL_ERRORS;
-
-	//-- Unbind target, and restore default values:
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindVertexArray(0);
-
-	CHECK_GL_ERRORS;
 }
 
 //----------------------------------------------------------------------------------------
@@ -215,7 +212,9 @@ void A3::initPerspectiveMatrix()
 
 //----------------------------------------------------------------------------------------
 void A3::initViewMatrix() {
-	m_view = glm::lookAt(vec3(0.0f, 1.0f, 25.0f), vec3(0.0f, 1.0f, -1.0f),
+	m_controller->m_lookFrom = vec3(0.0f, 1.0f, 10.0f);
+	m_controller->m_lookAt = vec3(0.0f, 0.0f, 0.0f);
+	m_controller->m_view = glm::lookAt(m_controller->m_lookFrom, m_controller->m_lookAt,
 			vec3(0.0f, 1.0f, 0.0f));
 }
 
@@ -288,12 +287,12 @@ void A3::buildNodeMapsRecur(SceneNode* root) {
 void A3::uploadCommonSceneUniforms() {
 		m_shader.enable();
 		{
-			//-- Set Perpsective matrix uniform for the scene:
+			// //-- Set Perpsective matrix uniform for the scene:
 			GLint location = m_shader.getUniformLocation("Perspective");
 			glUniformMatrix4fv(location, 1, GL_FALSE, value_ptr(m_perpsective));
 			CHECK_GL_ERRORS;
 
-
+			// GLint location;
 			//-- Set LightSource uniform for the scene:
 			{
 				location = m_shader.getUniformLocation("light.position");
@@ -310,6 +309,13 @@ void A3::uploadCommonSceneUniforms() {
 				glUniform3fv(location, 1, value_ptr(ambientIntensity));
 				CHECK_GL_ERRORS;
 			}
+
+			//-- Set skybox
+			{
+				location = m_shader.getUniformLocation("skybox");
+				glUniform1i(location, 0);
+				CHECK_GL_ERRORS;
+			}
 		}
 		m_shader.disable();
 }
@@ -320,7 +326,12 @@ void A3::uploadCommonSceneUniforms() {
  */
 void A3::appLogic()
 {
-
+	// m_lookAt = vec3(rotate(mat4(1.0f), 0.01f, vec3(0.0f, 1.0f, 0.0f)) * vec4(m_lookAt, 1.0f));
+	// m_view = glm::lookAt(m_lookFrom, m_lookAt, vec3(0.0f, 1.0f, 0.0f));
+	m_controller->m_lookFrom += KEY_STEP * m_controller->m_movingDirection;
+	// m_controller->m_lookFrom += KEY_STEP * vec3(0.0f, 1.0f, 0.0f);
+	m_controller->m_view = glm::lookAt(m_controller->m_lookFrom,
+		m_controller->m_lookAt, vec3(0.0f, 1.0f, 0.0f));
 	uploadCommonSceneUniforms();
 }
 
@@ -407,7 +418,12 @@ void A3::draw() {
 	// Bind the VAO once here, and reuse for all GeometryNode rendering below.
 	glBindVertexArray(m_vao_meshData);
 
+	// Set up skybox for objects reflection
+	m_skybox.bindTexture();
+
 	renderSceneGraph(*m_rootNode);
+
+	m_skybox.render(m_controller->m_view, m_perpsective);
 }
 
 //----------------------------------------------------------------------------------------
@@ -415,7 +431,7 @@ void A3::renderSceneGraph(SceneNode & root) {
 	RenderParams params(
 		&m_shader,
 		m_controller->rootTranslater * m_controller->rootRotater,
-		m_view, &m_batchInfoMap);
+		m_controller->m_view, &m_batchInfoMap);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -520,20 +536,6 @@ bool A3::mouseButtonInputEvent (
 		}
 	}
 
-	if (
-		(Controller::Mode) m_controller->mode == Controller::Mode::JOINTS &&
-		actions == GLFW_RELEASE)
-	{
-		if (button == GLFW_MOUSE_BUTTON_MIDDLE && !m_controller->middleMouseOperations.empty()) {
-			m_controller->m_operations->addOperations(m_controller->middleMouseOperations);
-			m_controller->middleMouseOperations.clear();
-		}
-		if (button == GLFW_MOUSE_BUTTON_RIGHT && !m_controller->middleMouseOperations.empty()) {
-			m_controller->m_operations->addOperations(m_controller->rightMouseOperations);
-			m_controller->rightMouseOperations.clear();
-		}
-	}
-
 	return eventHandled;
 }
 
@@ -587,12 +589,26 @@ bool A3::keyInputEvent (
 		if (key == GLFW_KEY_O) {
 			m_controller->resetOrientation();
 		}
-		if (key == GLFW_KEY_S) {
-			m_controller->resetJoints();
-		}
+
 		if (key == GLFW_KEY_A) {
-			m_controller->resetAll();
+			m_controller->m_movingDirection.x = -1.0f;
 		}
+		if (key == GLFW_KEY_D) {
+			m_controller->m_movingDirection.x = 1.0f;
+		}
+		if (key == GLFW_KEY_Q) {
+			m_controller->m_movingDirection.y = 1.0f;
+		}
+		if (key == GLFW_KEY_E) {
+			m_controller->m_movingDirection.y = -1.0f;
+		}
+		if (key == GLFW_KEY_W) {
+			m_controller->m_movingDirection.z = -1.0f;
+		}
+		if (key == GLFW_KEY_S) {
+			m_controller->m_movingDirection.z = 1.0f;
+		}
+
 		if (key == GLFW_KEY_U) {
 			if (!m_controller->m_operations->undo()) {
 				invalidOperation = "undo";
@@ -610,6 +626,29 @@ bool A3::keyInputEvent (
 			m_controller->mode = (int) Controller::Mode::JOINTS;
 		}
 	}
+
+
+	if( action == GLFW_RELEASE ) {
+		if (key == GLFW_KEY_A) {
+			m_controller->m_movingDirection.x = 0.0f;
+		}
+		if (key == GLFW_KEY_D) {
+			m_controller->m_movingDirection.x = 0.0f;
+		}
+		if (key == GLFW_KEY_Q) {
+			m_controller->m_movingDirection.y = 0.0f;
+		}
+		if (key == GLFW_KEY_E) {
+			m_controller->m_movingDirection.y = 0.0f;
+		}
+		if (key == GLFW_KEY_W) {
+			m_controller->m_movingDirection.z = 0.0f;
+		}
+		if (key == GLFW_KEY_S) {
+			m_controller->m_movingDirection.z = 0.0f;
+		}
+	}
+
 	// Fill in with event handling code...
 
 	return eventHandled;
@@ -621,7 +660,8 @@ Controller::Controller()
 	: mode(1),
 		lastMouseLoc(0.0f, 0.0f),
 		m_trackBall(new TrackBall()),
-		m_operations(new OperationStack())
+		m_operations(new OperationStack()),
+		m_movingDirection(0.0f)
 	{
 		reset();
 	}
@@ -653,29 +693,22 @@ void Controller::updateUponMouseMoveEvent(vec2 mousePos, float fDiameter, vec2 c
 	}
 	else if ((Controller::Mode) mode == Controller::Mode::JOINTS)
 	{
-		std::vector<JointNode*> selected;
+		glm::vec3 axis(0.0f);
+		if (pressed(Controller::MouseButton::LEFT)) {
+			axis.x = 1.0f;
+		}
 		if (pressed(Controller::MouseButton::MIDDLE)) {
-			vec2 rotateAngle = vec2(mouseLocChange.y * 100.0f, 0.0f);
-
-			for (auto kv : nodeMap) {
-				JointNode* jointNode = dynamic_cast<JointNode*>(kv.second);
-				if (jointNode != nullptr && jointNode->isSelected) {
-					selected.push_back(jointNode);
-				}
-			}
-			middleMouseOperations.emplace_back(selected, rotateAngle);
-			middleMouseOperations.back().execute();
+			axis.y = 1.0f;
 		}
 		if (pressed(Controller::MouseButton::RIGHT)) {
-			vec2 rotateAngle = vec2(0.0f, mouseLocChange.x * 100.0f);
-			for (auto kv : nodeMap) {
-				JointNode* jointNode = dynamic_cast<JointNode*>(kv.second);
-				if (jointNode != nullptr && jointNode->isSelected && jointNode->isHeadJoint()) {
-					selected.push_back(jointNode);
-				}
-			}
-			rightMouseOperations.emplace_back(selected, rotateAngle);
-			rightMouseOperations.back().execute();
+			axis.z = 1.0f;
+		}
+		// m_lookAt = vec3(rotate(mat4(1.0f), 0.01f, vec3(0.0f, 1.0f, 0.0f)) * vec4(m_lookAt, 1.0f));
+		if (axis != vec3(0.0f)) {
+			glm::mat4 rotation = glm::rotate(mat4(1.0f), (float) (2 * PI * mouseLocChange.x), axis);
+			glm::vec3 direction = vec3(rotation * vec4((m_lookAt - m_lookFrom), 0.0f));
+			m_lookAt = m_lookFrom + direction;
+			m_view = glm::lookAt(m_lookFrom, m_lookAt, vec3(0.0f, 1.0f, 0.0f));
 		}
 	}
 

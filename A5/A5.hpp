@@ -12,6 +12,7 @@
 
 #include "SceneNode.hpp"
 #include "TrackBall.hpp"
+#include "Skybox.hpp"
 
 #include <glm/glm.hpp>
 
@@ -74,6 +75,12 @@ public:
 	std::unique_ptr<OperationStack> m_operations;
 	std::vector<Operation> middleMouseOperations;
 	std::vector<Operation> rightMouseOperations;
+
+	glm::vec3 m_lookFrom;
+	glm::vec3 m_lookAt;
+	glm::mat4 m_view;
+
+	glm::vec3 m_movingDirection;
 };
 
 
@@ -115,7 +122,7 @@ protected:
 	void buildNodeMapsRecur(SceneNode* root);
 
 	glm::mat4 m_perpsective;
-	glm::mat4 m_view;
+
 
 	LightSource m_light;
 
@@ -146,4 +153,6 @@ protected:
 	std::unordered_map<unsigned int, std::list<SceneNode*>> m_jointGroupMap;
 
 	std::string invalidOperation;
+
+	Skybox m_skybox;
 };

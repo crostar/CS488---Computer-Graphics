@@ -24,6 +24,8 @@ uniform Material material;
 // Ambient light intensity for each RGB component.
 uniform vec3 ambientIntensity;
 
+uniform samplerCube skybox;
+
 
 vec3 phongModel(vec3 fragPosition, vec3 fragNormal) {
 	LightSource light = fs_in.light;
@@ -49,9 +51,15 @@ vec3 phongModel(vec3 fragPosition, vec3 fragNormal) {
         specular = material.ks * pow(n_dot_h, material.shininess);
     }
 
-    return ambientIntensity + light.rgbIntensity * (diffuse + specular);
+  vec3 R = reflect(-v, fragNormal);
+  vec3 reflectColor = texture(skybox, R).rgb;
+
+    return reflectColor + ambientIntensity + light.rgbIntensity * (diffuse + specular);
+       // - (ambientIntensity + light.rgbIntensity * (diffuse + specular));
+
 }
 
 void main() {
+
 	fragColour = vec4(phongModel(fs_in.position_ES, fs_in.normal_ES), 1.0);
 }

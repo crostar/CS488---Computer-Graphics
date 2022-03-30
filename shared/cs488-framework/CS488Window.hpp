@@ -25,10 +25,11 @@ public:
 			float fps = 60.0f
 	);
 
+  static std::string getAssetFilePath(const char *base);
+
 protected:
     CS488Window(); // Prevent direct construction.
 
-	static std::string getAssetFilePath(const char *base);
 
     // Virtual methods.
     // Override these within derived classes.
@@ -60,7 +61,7 @@ private:
 	static std::shared_ptr<CS488Window> m_instance;
 
 	static std::string m_exec_dir;
-    
+
     GLFWmonitor * m_monitor;
 
 	static std::shared_ptr<CS488Window> getInstance();

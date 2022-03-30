@@ -3,13 +3,12 @@
  */
 #pragma once
 
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
-#include <stb_image.h>
-
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/ext.hpp>
+#include <vector>
+
+#include "cs488-framework/ShaderProgram.hpp"
 
 
 class Skybox {
@@ -17,12 +16,18 @@ public:
   Skybox();
   ~Skybox();
 
-  // Render to current framebuffer
-  render(const glm::mat4& viewMatrix, const glm::mat4& projMatrix);
+  void init();
 
+  // Render to current framebuffer
+  void render(const glm::mat4& viewMatrix, const glm::mat4& projMatrix);
+
+  unsigned int getTexture() { return m_texture; }
+  void bindTexture() { glBindTexture(GL_TEXTURE_CUBE_MAP, m_texture); }
+  
 private:
-  void loadTexture(vector<std::string> faces);
+  void loadTexture(std::vector<std::string> faces);
 
   unsigned int m_vao, m_vbo;
   unsigned int m_texture;
+  ShaderProgram m_shader;
 };
