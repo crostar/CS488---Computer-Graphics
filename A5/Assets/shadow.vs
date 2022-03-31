@@ -17,11 +17,12 @@ uniform mat4 view;
 uniform mat4 model;
 uniform mat4 Perspective;
 uniform mat4 lightSpaceMatrix;
+uniform float revertNormal;
 
 void main()
 {
     vs_out.FragPos = vec3(model * vec4(position, 1.0));
-    vs_out.Normal = transpose(inverse(mat3(model))) * normal;
+    vs_out.Normal = revertNormal * transpose(inverse(mat3(model))) * normal;
     vs_out.TexCoords = vec2(
       (atan(position.z , position.x) + PI) / (2.0 * PI),
       asin(-position.y) / PI + 0.5

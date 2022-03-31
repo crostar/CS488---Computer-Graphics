@@ -126,6 +126,7 @@ protected:
 	void renderSceneGraph(SceneNode &node);
 	void renderDepth(SceneNode &node, glm::mat4 lightSpaceMatrix);
 	void renderFromViewPoint(SceneNode &node, glm::mat4 lightSpaceMatrix);
+	void renderDebug(float near_plane, float far_plane);
 	void updateModel();
 	void buildNodeMapsRecur(SceneNode* root);
 
@@ -180,4 +181,7 @@ protected:
 	// GLint m_positionAttribLocation;
 	// GLint m_normalAttribLocation;
 	ShaderProgram m_depth_shader;
+	ShaderProgram m_debugShader;
+	unsigned int quadVAO = 0;
+	unsigned int quadVBO;
 };

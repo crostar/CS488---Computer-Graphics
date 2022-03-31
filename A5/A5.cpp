@@ -330,6 +330,9 @@ void A3::uploadCommonSceneUniforms() {
 				location = m_shader.getUniformLocation("diffuseTexture");
 				glUniform1i(location, 0);
 				CHECK_GL_ERRORS;
+				location = m_shader.getUniformLocation("shadowMap");
+				glUniform1i(location, 1);
+				CHECK_GL_ERRORS;
 			}
 		}
 		m_shader.disable();
@@ -342,7 +345,7 @@ void A3::initPlanets() {
 	Planet* moon = new Planet("moon", dynamic_cast<GeometryNode*>(
 		m_nodeNameMap.at("moon")), 0.3f, 1.5f, 1.0f / 30.0f, 1.0f / 3.0f);
 	Planet* sun = new Planet("sun", dynamic_cast<GeometryNode*>(
-		m_nodeNameMap.at("sun")), 1.0f, 0.0f, 0.0f, 1.0f / 2.70f);
+		m_nodeNameMap.at("sun")), 1.0f, 0.0f, 0.0f, 1.0f / 27.0f);
 	moon->m_parent = earth;
 	m_planets.emplace("earth", earth);
 	m_planets.emplace("moon", moon);
@@ -363,16 +366,20 @@ void A3::initParticleGenerator() {
 
 //----------------------------------------------------------------------------------------
 void A3::initShadowMapping() {
+	const unsigned int SHADOW_WIDTH = m_windowWidth, SHADOW_HEIGHT = m_windowHeight;
 	glGenFramebuffers(1, &m_fbo_depthMap);
 
 	glGenTextures(1, &m_tex_depthMap);
 	glBindTexture(GL_TEXTURE_2D, m_tex_depthMap);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
-	             SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32,
+	             SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT32, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glBindTexture(GL_TEXTURE_2D, 0);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, m_fbo_depthMap);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_tex_depthMap, 0);
@@ -385,6 +392,17 @@ void A3::initShadowMapping() {
 	m_depth_shader.attachVertexShader( getAssetFilePath("depth.vs").c_str() );
 	m_depth_shader.attachFragmentShader( getAssetFilePath("depth.fs").c_str() );
 	m_depth_shader.link();
+
+	// Debug
+	m_debugShader.generateProgramObject();
+	m_debugShader.attachVertexShader( getAssetFilePath("shadow_debug.vs").c_str() );
+	m_debugShader.attachFragmentShader( getAssetFilePath("shadow_debug.fs").c_str() );
+	m_debugShader.link();
+	m_debugShader.enable();
+	GLint location = m_debugShader.getUniformLocation("depthMap");
+	glUniform1i(location, 0);
+	m_debugShader.disable();
+	CHECK_GL_ERRORS;
 }
 
 //----------------------------------------------------------------------------------------
@@ -499,33 +517,77 @@ void A3::draw() {
 	renderSceneGraph(*m_rootNode);
 
 	m_particle->draw(m_controller->m_view, m_perpsective);
-
+	//
 	m_skybox.render(m_controller->m_view, m_perpsective);
 }
 
 //----------------------------------------------------------------------------------------
 void A3::renderSceneGraph(SceneNode & root) {
+	const float EPSILON = 1e-3;
 	Planet* earth = m_planets[string("earth")];
 	glm::vec3 earthLocation(earth->orbitR * glm::cos(earth->rotation),
 		0.0f, -earth->orbitR * glm::sin(earth->rotation));
 	glm::mat4 lightProjection, lightView;
 	glm::mat4 lightSpaceMatrix;
-	float near_plane = m_planets[string("sun")]->radius;
-	float far_plane =
-		m_planets[string("earth")]->orbitR +
-		m_planets[string("moon")]->orbitR +
-		m_planets[string("moon")]->radius;
+	// float near_plane = m_planets[string("sun")]->radius + EPSILON;
+	// float far_plane =
+	// 	m_planets[string("earth")]->orbitR +
+	// 	m_planets[string("moon")]->orbitR +
+	// 	m_planets[string("moon")]->radius;
+	float near_plane = 0.01f;
+	float far_plane = 10.0f;
 
-	lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+	lightProjection = glm::ortho(-6.0f, 6.0f, -6.0f, 6.0f, near_plane, far_plane);
+	// lightProjection = glm::frustum(-1.0f, 1.0f, -1.0f, 1.0f, near_plane, far_plane);
 	lightView = glm::lookAt(m_light.position, earthLocation, glm::vec3(0.0, 1.0, 0.0));
-	lightSpaceMatrix = lightProjection * lightView;
+	lightSpaceMatrix = lightProjection * lightView;// * m_controller->rootTranslater * m_controller->rootRotater;
 
 	// First pass of shadow mapping: render depth
 	renderDepth(root, lightSpaceMatrix);
 	// Second pass, do the actual render from view point
 	renderFromViewPoint(root, lightSpaceMatrix);
+	// debug shadow
+	// renderDebug(near_plane, far_plane);
 
 	CHECK_GL_ERRORS;
+}
+
+//----------------------------------------------------------------------------------------
+void A3::renderDebug(float near_plane, float far_plane) {
+	m_debugShader.enable();
+	// GLint location = m_debugShader.getUniformLocation("near_plane");
+	// glUniform1f(location, near_plane);
+	// CHECK_GL_ERRORS;
+	// location = m_debugShader.getUniformLocation("far_plane");
+	// glUniform1f(location, far_plane);
+	// CHECK_GL_ERRORS;
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, m_tex_depthMap);
+	if (quadVAO == 0)
+	{
+			float quadVertices[] = {
+					// positions        // texture Coords
+					-1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+					-1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+					 1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+					 1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+			};
+			// setup plane VAO
+			glGenVertexArrays(1, &quadVAO);
+			glGenBuffers(1, &quadVBO);
+			glBindVertexArray(quadVAO);
+			glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+			glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+			glEnableVertexAttribArray(0);
+			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+			glEnableVertexAttribArray(1);
+			glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+	}
+	glBindVertexArray(quadVAO);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	glBindVertexArray(0);
+	m_debugShader.disable();
 }
 
 //----------------------------------------------------------------------------------------
@@ -548,7 +610,10 @@ void A3::renderDepth(SceneNode & root, glm::mat4 lightSpaceMatrix) {
 	// render scene from light's point of view
 	glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
 	glBindFramebuffer(GL_FRAMEBUFFER, m_fbo_depthMap);
+			// glClearDepth(1.0f);
 			glClear(GL_DEPTH_BUFFER_BIT);
+			// glEnable(GL_POLYGON_OFFSET_FILL);
+			// glPolygonOffset(0.2f, 0.4f);
 
 			RenderParams params(
 				&m_depth_shader, m_controller->rootTranslater * m_controller->rootRotater,
@@ -556,6 +621,8 @@ void A3::renderDepth(SceneNode & root, glm::mat4 lightSpaceMatrix) {
 				lightSpaceMatrix, &m_batchInfoMap, true);
 
 			root.render(params);
+			// glDisable(GL_POLYGON_OFFSET_FILL);
+
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	// reset viewport

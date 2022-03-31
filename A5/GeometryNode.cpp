@@ -21,6 +21,11 @@ void updateShaderUniforms(
 			glUniformMatrix4fv(location, 1, GL_FALSE, value_ptr(params.m_lightSpaceMatrix));
 			CHECK_GL_ERRORS;
 
+			location = params.m_shader->getUniformLocation("model");
+			mat4 model = params.m_model * stackedTrans * node.trans;
+			glUniformMatrix4fv(location, 1, GL_FALSE, value_ptr(model));
+			CHECK_GL_ERRORS;
+
 		return;
 	}
 
@@ -30,7 +35,7 @@ void updateShaderUniforms(
 	params.m_shader->enable();
 		//-- Set ModelView matrix:
 		GLint location = params.m_shader->getUniformLocation("model");
-		mat4 model = stackedTrans * node.trans;
+		mat4 model = params.m_model * stackedTrans * node.trans;
 		glUniformMatrix4fv(location, 1, GL_FALSE, value_ptr(model));
 		CHECK_GL_ERRORS;
 
@@ -49,6 +54,16 @@ void updateShaderUniforms(
 		location = params.m_shader->getUniformLocation("lightSpaceMatrix");
 		glUniformMatrix4fv(location, 1, GL_FALSE, value_ptr(params.m_lightSpaceMatrix));
 		CHECK_GL_ERRORS;
+
+		if (node.m_name == "sun") {
+			location = params.m_shader->getUniformLocation("revertNormal");
+			glUniform1f(location, -1.0f);
+			CHECK_GL_ERRORS;
+		} else {
+			location = params.m_shader->getUniformLocation("revertNormal");
+			glUniform1f(location, 1.0f);
+			CHECK_GL_ERRORS;
+		}
 
 		// //-- Set NormMatrix:
 		// location = params.m_shader->getUniformLocation("NormalMatrix");
@@ -112,15 +127,15 @@ void GeometryNode::renderRecur(
 	BatchInfo batchInfo = params.m_batchInfoMap->at(meshId);
 
 	//-- Now render the mesh:
-	if (m_name == "sun") {
-		if (!params.m_isDepth) {
-			glCullFace(GL_FRONT);
-			glDrawArrays(GL_TRIANGLES, batchInfo.startIndex, batchInfo.numIndices);
-			glCullFace(GL_BACK);
-		}
-	} else {
+	// if (m_name == "sun" || m_name == "star" || m_name == "moon") {
+		// if (!params.m_isDepth) {
+		// 	glFrontFace(GL_CW);
+		// 	glDrawArrays(GL_TRIANGLES, batchInfo.startIndex, batchInfo.numIndices);
+		// 	glFrontFace(GL_CCW);
+		// }
+	// } else {
 		glDrawArrays(GL_TRIANGLES, batchInfo.startIndex, batchInfo.numIndices);
-	}
+	// }
 	params.m_shader->disable();
 
 	for (SceneNode * node : children) {
