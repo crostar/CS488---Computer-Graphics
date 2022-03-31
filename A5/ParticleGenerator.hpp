@@ -1,6 +1,6 @@
-/*
- * Referencing https://learnopengl.com/In-Practice/2D-Game/Particles
- */
+// /*
+//  * Referencing https://learnopengl.com/In-Practice/2D-Game/Particles
+//  */
 #pragma once
 
 #include <glm/glm.hpp>
@@ -9,11 +9,13 @@
 #include <vector>
 
 #include "cs488-framework/ShaderProgram.hpp"
+#include "ShootingStar.hpp"
+
 
 struct Particle {
-    glm::vec3 m_position, m_velocity;
-    glm::vec4 m_color;
-    float     m_life;
+    glm::vec3 Position, Velocity;
+    glm::vec4 Color;
+    float     Life;
 
     Particle()
       : Position(0.0f), Velocity(0.0f), Color(1.0f), Life(0.0f) { }
@@ -26,23 +28,25 @@ class ParticleGenerator
 {
 public:
     // constructor
-    ParticleGenerator(Shader shader, Texture2D texture, unsigned int amount);
+    ParticleGenerator(unsigned int amount);
     // update all particles
-    void Update(float dt, glm::vec3 loc, unsigned int newParticles, glm::vec2 offset = glm::vec2(0.0f, 0.0f));
+    void update(float dt, ShootingStar* star, unsigned int newParticles,
+      glm::vec3 offset = glm::vec3(0.0f));
     // render all particles
-    void Draw();
+    void draw(const glm::mat4& view, const glm::mat4& projection);
 private:
     // state
     std::vector<Particle> particles;
     unsigned int amount;
     // render state
-    Shader shader;
-    Texture2D texture;
+    ShaderProgram shader;
+    unsigned int texture;
     unsigned int VAO;
     // initializes buffer and vertex attributes
     void init();
     // returns the first Particle index that's currently unused e.g. Life <= 0.0f or 0 if no particle is currently inactive
     unsigned int firstUnusedParticle();
     // respawns particle
-    void respawnParticle(Particle &particle, glm::vec3 loc, glm::vec2 offset = glm::vec2(0.0f, 0.0f));
+    void respawnParticle(Particle &particle, ShootingStar* star,
+      glm::vec3 offset = glm::vec3(0.0f));
 };

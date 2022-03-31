@@ -24,14 +24,24 @@ public:
 		const ShaderProgram* shader,
 		const glm::mat4 model,
 		const glm::mat4 view,
-		const BatchInfoMap* batchInfoMap
-	) : m_shader(shader), m_model(model),
-			m_view(view), m_batchInfoMap(batchInfoMap){}
+		const glm::vec3 viewPos,
+		const glm::vec3 lightPos,
+		const glm::mat4 lightSpaceMatrix,
+		const BatchInfoMap* batchInfoMap,
+		bool isDepth
+	) : m_shader(shader), m_model(model), m_view(view),
+			m_viewPos(viewPos), m_lightPos(lightPos),
+			m_lightSpaceMatrix(lightSpaceMatrix),
+			m_batchInfoMap(batchInfoMap), m_isDepth(isDepth){}
 
 	const ShaderProgram* m_shader;
 	const glm::mat4 m_model;
 	const glm::mat4 m_view;
+	const glm::vec3 m_viewPos;
+	const glm::vec3 m_lightPos;
+	const glm::mat4 m_lightSpaceMatrix;
 	const BatchInfoMap* m_batchInfoMap;
+	bool m_isDepth;
 };
 
 enum class NodeType {

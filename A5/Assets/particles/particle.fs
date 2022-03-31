@@ -1,11 +1,11 @@
 #version 330 core
 in vec2 TexCoords;
 in vec4 ParticleColor;
-out vec4 color;
+out vec4 fragColour;
 
 uniform sampler2D sprite;
 
 void main()
 {
-    color = (texture(sprite, TexCoords) * ParticleColor);
-}  
+    fragColour = vec4(vec3(texture(sprite, TexCoords)), ParticleColor.a);
+}

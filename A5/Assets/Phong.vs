@@ -1,4 +1,5 @@
 #version 330
+#define PI 3.1415926535897932384626433832795
 
 // Model-Space coordinates
 in vec3 position;
@@ -23,6 +24,8 @@ out VsOutFsIn {
 	LightSource light;
 } vs_out;
 
+out vec2 TextCoor;
+
 
 void main() {
 	vec4 pos4 = vec4(position, 1.0);
@@ -32,6 +35,16 @@ void main() {
 	vs_out.normal_ES = normalize(NormalMatrix * normal);
 
 	vs_out.light = light;
+
+  TextCoor = vec2(
+    (atan(position.z , position.x) + PI) / (2.0 * PI),
+    asin(-position.y) / PI + 0.5
+  );
+
+  //TextCoor = vec2(
+  //  atan(position.y, position.x) / PI + 1.0,
+  //  asin(position.z) / PI + 0.5
+  //);
 
 	gl_Position = Perspective * ModelView * vec4(position, 1.0);
 }

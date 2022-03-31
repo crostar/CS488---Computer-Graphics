@@ -11,8 +11,11 @@
 #include "cs488-framework/MeshConsolidator.hpp"
 
 #include "SceneNode.hpp"
+#include "GeometryNode.hpp"
 #include "TrackBall.hpp"
 #include "Skybox.hpp"
+#include "ShootingStar.hpp"
+#include "ParticleGenerator.hpp"
 
 #include <glm/glm.hpp>
 
@@ -113,11 +116,16 @@ protected:
 	void initViewMatrix();
 	void initLightSources();
 	void buildNodeMaps();
+	void initPlanets();
+	void initParticleGenerator();
+	void initShadowMapping();
 
 	void initPerspectiveMatrix();
 	void uploadCommonSceneUniforms();
 	// void renderSceneGraph(const SceneNode &node);
 	void renderSceneGraph(SceneNode &node);
+	void renderDepth(SceneNode &node, glm::mat4 lightSpaceMatrix);
+	void renderFromViewPoint(SceneNode &node, glm::mat4 lightSpaceMatrix);
 	void updateModel();
 	void buildNodeMapsRecur(SceneNode* root);
 
@@ -149,10 +157,27 @@ protected:
 	std::unordered_map<unsigned int, SceneNode*> m_upperJointMap;
 	// Maps node id to its node pointer
 	std::unordered_map<unsigned int, SceneNode*> m_nodeMap;
+	// Maps node name to its node id
+	std::unordered_map<std::string, SceneNode*> m_nodeNameMap;
 	// Maps joint to all the geometry node it controls
 	std::unordered_map<unsigned int, std::list<SceneNode*>> m_jointGroupMap;
 
 	std::string invalidOperation;
 
 	Skybox m_skybox;
+
+	// Planet movements
+	std::unordered_map<std::string, Planet*> m_planets;
+	ShootingStar* m_shooting;
+
+	ParticleGenerator* m_particle;
+
+	//-- GL resources for shadow mapping
+	GLuint m_fbo_depthMap;
+	GLuint m_tex_depthMap;
+	// GLuint m_vbo_vertexPositions;
+	// GLuint m_vbo_vertexNormals;
+	// GLint m_positionAttribLocation;
+	// GLint m_normalAttribLocation;
+	ShaderProgram m_depth_shader;
 };
