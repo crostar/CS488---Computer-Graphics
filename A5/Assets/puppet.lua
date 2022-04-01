@@ -8,7 +8,7 @@ mouthBlack = gr.material({0.1, 0.1, 0.1}, {0, 0, 0}, 50.0)
 beltBlack = gr.material({0.1, 0.1, 0.1}, {0.8, 0.8, 0.8}, 50.0)
 lightBlue = gr.material({0.45, 0.65, 0.8}, {0.045, 0.065, 0.08}, 1.0)
 darkBlue = gr.material({0.6, 0.65, 0.85}, {0.06, 0.065, 0.085}, 100.0)
-gold = gr.material({1.0, 0.8, 0.0}, {0, 0, 0}, 50.0)
+gold = gr.material({1.0, 0.8, 0.0}, {0, 0, 0}, 2.0)
 -- white = gr.material({0.8, 0.85, 0.6}, {0, 0, 0}, 1.0)
 white = gr.material({0.9, 0.95, 0.9}, {0, 0, 0}, 1.0)
 
@@ -20,7 +20,7 @@ end
 
 function Earth()
   earth = gr.mesh('sphere', 'earth')
-  earth:set_material(green)
+  earth:set_material(white)
   return earth
 end
 

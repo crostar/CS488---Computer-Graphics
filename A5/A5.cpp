@@ -221,7 +221,7 @@ void A3::initPerspectiveMatrix()
 
 //----------------------------------------------------------------------------------------
 void A3::initViewMatrix() {
-	m_controller->m_lookFrom = vec3(0.0f, 1.0f, 10.0f);
+	m_controller->m_lookFrom = vec3(0.0f, 5.0f, 10.0f);
 	m_controller->m_lookAt = vec3(0.0f, 0.0f, 0.0f);
 	m_controller->m_view = glm::lookAt(m_controller->m_lookFrom, m_controller->m_lookAt,
 			vec3(0.0f, 1.0f, 0.0f));
@@ -232,7 +232,7 @@ void A3::initLightSources() {
 	// World-space position
 	// m_light.position = vec3(0.0f, 0.0f, 5.0f);
 	m_light.position = vec3(0.0f, 0.0f, 0.0f);
-	m_light.rgbIntensity = vec3(1.0f); // light
+	m_light.intensity = 1.0f; // light
 }
 
 //----------------------------------------------------------------------------------------
@@ -333,7 +333,23 @@ void A3::uploadCommonSceneUniforms() {
 				location = m_shader.getUniformLocation("shadowMap");
 				glUniform1i(location, 1);
 				CHECK_GL_ERRORS;
+
+				// Set fog
+				location = m_shader.getUniformLocation("fogMaxdist");
+				glUniform1f(location, 16.0f);
+				CHECK_GL_ERRORS;
+				location = m_shader.getUniformLocation("fogMindist");
+				glUniform1f(location, 5.0f);
+				CHECK_GL_ERRORS;
+				location = m_shader.getUniformLocation("lightIntensity");
+				glUniform1f(location, m_light.intensity);
+				CHECK_GL_ERRORS;
+
 			}
+
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			glEnable(GL_BLEND);
+			// glDisable(GL_BLEND);
 		}
 		m_shader.disable();
 }
@@ -341,7 +357,7 @@ void A3::uploadCommonSceneUniforms() {
 //----------------------------------------------------------------------------------------
 void A3::initPlanets() {
 	Planet* earth = new Planet("earth", dynamic_cast<GeometryNode*>(
-		m_nodeNameMap.at("earth")), 0.7f, 4.0f, 1.0f / 365.0f, 1.0f);
+		m_nodeNameMap.at("earth")), 0.7f, 4.0f, 1.0f / 36.50f, 1.0f);
 	Planet* moon = new Planet("moon", dynamic_cast<GeometryNode*>(
 		m_nodeNameMap.at("moon")), 0.3f, 1.5f, 1.0f / 30.0f, 1.0f / 3.0f);
 	Planet* sun = new Planet("sun", dynamic_cast<GeometryNode*>(
@@ -371,15 +387,15 @@ void A3::initShadowMapping() {
 
 	glGenTextures(1, &m_tex_depthMap);
 	glBindTexture(GL_TEXTURE_2D, m_tex_depthMap);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32,
-	             SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT32, GL_FLOAT, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
+	             SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glBindTexture(GL_TEXTURE_2D, 0);
+	// glBindTexture(GL_TEXTURE_2D, 0);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, m_fbo_depthMap);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_tex_depthMap, 0);

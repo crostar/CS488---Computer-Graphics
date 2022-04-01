@@ -92,15 +92,9 @@ void updateShaderUniforms(
 		// glUniform3fv(location, 1, value_ptr(ks));
 		// CHECK_GL_ERRORS;
 		//
-		// location = params.m_shader->getUniformLocation("material.shininess");
-		// float shininess;
-		// if (node.isSelected) {
-		// 	shininess = 0.0f;
-		// } else {
-		// 	shininess = node.material.shininess;
-		// }
-		// glUniform1f(location, shininess);
-		// CHECK_GL_ERRORS;
+		location = params.m_shader->getUniformLocation("shininess");
+		glUniform1f(location, node.material.shininess);
+		CHECK_GL_ERRORS;
 }
 
 //---------------------------------------------------------------------------------------

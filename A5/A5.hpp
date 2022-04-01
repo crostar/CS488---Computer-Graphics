@@ -24,7 +24,7 @@
 
 struct LightSource {
 	glm::vec3 position;
-	glm::vec3 rgbIntensity;
+	float intensity;
 };
 
 class Controller {

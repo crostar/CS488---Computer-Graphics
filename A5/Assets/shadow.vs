@@ -11,6 +11,7 @@ out VS_OUT {
     vec3 Normal;
     vec2 TexCoords;
     vec4 FragPosLightSpace;
+    vec4 ViewCoor;
 } vs_out;
 
 uniform mat4 view;
@@ -29,4 +30,5 @@ void main()
     );
     vs_out.FragPosLightSpace = lightSpaceMatrix * vec4(vs_out.FragPos, 1.0);
     gl_Position = Perspective * view * model * vec4(position, 1.0);
+    vs_out.ViewCoor = view * model * vec4(position, 1.0);
 }
