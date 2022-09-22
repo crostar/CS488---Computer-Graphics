@@ -40,18 +40,19 @@ void A4_Render(
 			glm::vec3 origin(eye);
 			glm::vec3 direction;
 			glm::vec3 color(0.0f);
-			bool hit = false;
+			int hitCount = 0;
 			for (uint q=0; q<JITTERING_SIZE; q++) {
 				for (uint p=0; p<JITTERING_SIZE; p++) {
 					float xf = x + (p + rand() / double(RAND_MAX)) / JITTERING_SIZE;
 					float yf = y + (q + rand() / double(RAND_MAX)) / JITTERING_SIZE;
 					// Pass h-y in to set (0,0) to the bottom-left corner
-					getDirection(eye, view, up, fovy, w, h, xf, h-yf, direction);
-					hit = hit || getRGB(root, origin, direction, ambient, lights, color);
+					glm::vec3 direction = getDirection(eye, view, up, fovy, w, h, xf, h-yf);
+					hitCount += getRGB(root, origin, direction, ambient, color);
 				}
 			}
 
-			if (hit) {
+			if (hitCount) {
+				color = color / hitCount;
 				// Red:
 				image(x, y, 0) = (double) color.x;
 				// Green:
@@ -64,10 +65,9 @@ void A4_Render(
 
 }
 
-void getDirection(
+glm::vec3 getDirection(
 	glm::vec3 eye, glm::vec3 view, glm::vec3 up,
-	double fovy, size_t w, size_t h, float x, float y,
-	glm::vec3& direction) {
+	double fovy, size_t w, size_t h, float x, float y) {
 		float wf = static_cast<float>(w), hf = static_cast<float>(h);
 		float d = hf / (2 * glm::tan(glm::radians(fovy) / 2.0f));
 		glm::mat4 T1 = glm::translate(glm::mat4(), glm::vec3(-wf/2.0f, -hf/2.0f, d));
@@ -86,28 +86,25 @@ void getDirection(
 		glm::mat4 T4 = glm::translate(glm::mat4(), glm::vec3(eye.x, eye.y, eye.z));
 		glm::vec4 pixelCoor(x, y, 0.0f, 1.0f);
 		glm::vec4 worldCoor = T4 * R3 * S2 * T1 * pixelCoor;
-		direction = (glm::vec3(worldCoor) - eye);
+		return glm::vec3(worldCoor) - eye;
 }
 
 // Assumption: root node is a SceneNode
-bool getRGB(
+int getRGB(
 	SceneNode* root, glm::vec3 rayOrigin, glm::vec3 rayDirection,
 	// Lighting parameters
 	const glm::vec3 & ambient,
-	const std::list<Light *> & lights,
-	glm::vec3& color
+	glm::vec3& accColor
 ) {
 	HitParams params(rayOrigin, rayDirection, 20.0f, 0.0f);
 	bool hit = root->hit(params);
 
 	if (!hit) {
-		return false;
+		return 0;
 	}
 
 	GeometryNode* hitNode = params.objNode;
-	glm::vec3 normal = params.normal;
-	glm::vec3 hitPoint = params.hitPoint;
 
-	color = hitNode->m_material->getKd() * ambient;
-	return true;
+	accColor += hitNode->m_material->getKd() * ambient;
+	return 1;
 }
